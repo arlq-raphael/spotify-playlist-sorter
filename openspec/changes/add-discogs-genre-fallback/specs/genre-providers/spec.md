@@ -1,7 +1,8 @@
 ## Purpose
 
-Resolve each track's genres from an ordered set of sources (Spotify and Discogs) so that classification
-uses the best available data, with graceful fallback when a source is unavailable or returns nothing.
+Resolve each track's genres from an ordered set of sources (an exact ISRC lookup, Discogs, and Spotify)
+so that classification uses the best available data, preferring exact identification and degrading
+gracefully when a source is unavailable or returns nothing.
 
 ## ADDED Requirements
 
@@ -21,16 +22,26 @@ the FIRST provider that returns a non-empty genre set. The order SHALL be config
 - **WHEN** no provider returns genres for a track
 - **THEN** the track is treated as having no genre (existing no-genre-bucket fallback applies)
 
-### Requirement: Spotify genre provider
-The system SHALL provide a Spotify source that returns each track's artist genres, fetched in batches.
+### Requirement: ISRC-first exact identification
+When a track has an ISRC, the system SHALL attempt an exact lookup of that recording by ISRC and use the
+resulting genres BEFORE any fuzzy artist/title matching. This exact step is preferred because an ISRC is
+a globally unique recording identifier.
 
-#### Scenario: Spotify genres resolved
-- **WHEN** the Spotify provider is consulted for a track whose artist has genres
-- **THEN** it returns those genres
+#### Scenario: ISRC yields genres
+- **WHEN** a track has an ISRC and the exact lookup returns genres for it
+- **THEN** those genres are used and no fuzzy search is performed for that track
+
+#### Scenario: ISRC has no usable result
+- **WHEN** a track has an ISRC but the lookup finds no recording or no genres
+- **THEN** resolution falls through to the fuzzy providers
+
+#### Scenario: No ISRC
+- **WHEN** a track has no ISRC
+- **THEN** the exact ISRC step is skipped and resolution uses the fuzzy providers
 
 ### Requirement: Discogs genre provider
-The system SHALL provide a Discogs source that, for a track, searches Discogs by artist and track title
-and returns the best-matching release's genre and style values.
+The system SHALL provide a Discogs source that searches by artist and track title and returns the
+best-matching release's genre and style values.
 
 #### Scenario: Discogs styles resolved
 - **WHEN** the Discogs provider is consulted and a matching release exists
@@ -40,28 +51,36 @@ and returns the best-matching release's genre and style values.
 - **WHEN** no matching release is found
 - **THEN** the Discogs provider returns an empty genre set (so resolution falls through)
 
-### Requirement: Discogs is opt-in and token-gated
-The Discogs provider SHALL require a Discogs personal access token. When no token is configured the
-provider SHALL be skipped (with a user-visible notice) rather than causing an error, and resolution SHALL
-continue with the remaining providers.
+### Requirement: Spotify genre provider
+The system SHALL provide a Spotify source that returns each track's artist genres, fetched in batches.
 
-#### Scenario: No token configured
+#### Scenario: Spotify genres resolved
+- **WHEN** the Spotify provider is consulted for a track whose artist has genres
+- **THEN** it returns those genres
+
+### Requirement: Credentialed sources are opt-in and degrade gracefully
+A genre source that requires a credential (the Discogs personal access token) SHALL be skipped with a
+user-visible notice when the credential is not configured, rather than causing an error, and resolution
+SHALL continue with the remaining sources.
+
+#### Scenario: No Discogs token configured
 - **WHEN** the provider order includes Discogs but no token is set
-- **THEN** the Discogs provider is skipped and the system notifies the user
-- **AND** genre resolution proceeds using the other providers
+- **THEN** the Discogs source is skipped and the system notifies the user
+- **AND** genre resolution proceeds using the other sources
 
-### Requirement: Respect Discogs rate limits and identify the client
-The Discogs provider SHALL send a unique `User-Agent` on every request and SHALL stay within Discogs'
-documented rate limit, waiting and retrying when the API signals the limit is reached.
+### Requirement: Identify the client and respect rate limits
+Every external genre source (Discogs, and the ISRC lookup) SHALL send a unique `User-Agent` on every
+request and SHALL stay within that source's published rate limit, waiting and retrying when the API
+signals the limit is reached.
 
 #### Scenario: Rate limit signalled
-- **WHEN** Discogs responds that the rate limit is exceeded
-- **THEN** the provider waits and retries rather than failing the run
+- **WHEN** an external source responds that the rate limit is exceeded
+- **THEN** the source waits and retries rather than failing the run
 
-### Requirement: Cache Discogs lookups
-The Discogs provider SHALL cache results by artist and title so the same query is not repeated within a
-run (and ideally across runs), bounding the number of API calls.
+### Requirement: Cache external lookups
+External genre lookups SHALL be cached by their query key (ISRC, or artist+title) so the same lookup is
+not repeated within a run, and ideally across runs, bounding the number of API calls.
 
 #### Scenario: Repeated lookup served from cache
-- **WHEN** two tracks resolve to the same artist+title Discogs query
-- **THEN** the API is queried at most once for that query
+- **WHEN** two tracks resolve to the same lookup key
+- **THEN** the external API is queried at most once for that key

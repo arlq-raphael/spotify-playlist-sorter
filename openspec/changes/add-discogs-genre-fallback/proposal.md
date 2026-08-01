@@ -9,10 +9,16 @@ precisely to the tool's buckets, so using it as a genre source materially improv
 
 - Introduce **ordered, pluggable genre providers**. A new config key `genre_providers` lists sources in
   priority order; for each track the first provider that returns a non-empty genre set wins.
-- Add a **Discogs** genre provider: searches Discogs by artist + track title and returns the best
-  match's `genre` + `style` values (which feed the existing bucket rules).
-- Keep the **Spotify** genre provider (current behaviour) as one of the sources.
-- Default order is `[discogs, spotify]` — Discogs preferred, Spotify as fallback.
+- Prefer an **exact ISRC lookup** first: the Spotify track's `external_ids.isrc` is a globally unique
+  recording id. Resolve it via **MusicBrainz** (which exposes a direct ISRC→recording endpoint — Discogs
+  has no ISRC filter) to get that recording's genres. This gives high precision without acoustic
+  fingerprinting, which is infeasible here (the Web API no longer exposes audio or 30s previews).
+- Add a **Discogs** genre provider that searches by artist + track title and returns the best match's
+  `genre` + `style` values — granular styles that map cleanly to the buckets. Used for tracks the ISRC
+  step didn't resolve (MusicBrainz genre tags can be sparse), so Discogs remains the rich-style source.
+- Keep the **Spotify** genre provider (current behaviour) as the final source.
+- Default effective order: **exact ISRC (MusicBrainz) → Discogs → Spotify** (configurable via
+  `genre_providers`).
 - Discogs is **opt-in via a `DISCOGS_TOKEN`**: when no token is configured the Discogs provider is
   skipped (with a notice) and classification falls back to the next provider, so the tool still works
   Spotify-only with zero extra setup.
@@ -37,5 +43,7 @@ precisely to the tool's buckets, so using it as a genre source materially improv
   `genre_providers` and resolves genres via the provider chain instead of calling Spotify directly.
 - New optional credential `DISCOGS_TOKEN` (documented in `.env.example` / README); `config/genres.yaml`
   gains a `genre_providers` list and an optional Discogs section (user-agent, timeout).
-- Uses the `requests` library (already an indirect dependency via spotipy). Tests mock `api.discogs.com`
-  with the existing `responses` setup.
+- The track model captures each track's **ISRC** (`external_ids.isrc`) from the saved-tracks response.
+- Uses the `requests` library (already an indirect dependency via spotipy) for both Discogs and
+  MusicBrainz (MusicBrainz needs no token, only a `User-Agent`). Tests mock `api.discogs.com` and
+  `musicbrainz.org` with the existing `responses` setup.
