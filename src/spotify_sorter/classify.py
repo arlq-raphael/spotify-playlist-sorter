@@ -5,7 +5,7 @@ implements `bucket(track) -> str | None`.
 """
 from __future__ import annotations
 
-from typing import Optional, Protocol
+from typing import Protocol
 
 from .config import Config
 from .library import Track
@@ -14,7 +14,7 @@ from .library import Track
 class Classifier(Protocol):
     dimension: str
 
-    def bucket(self, track: Track) -> Optional[str]:
+    def bucket(self, track: Track) -> str | None:
         """Return the playlist name for this track, or None to skip it."""
         ...
 
@@ -27,7 +27,7 @@ class GenreClassifier:
         self.unmatched = config.unmatched_genre_bucket
         self.no_genre = config.no_genre_bucket
 
-    def bucket(self, track: Track) -> Optional[str]:
+    def bucket(self, track: Track) -> str | None:
         if not track.genres:
             return self.no_genre
         for b in self.buckets:  # ordered: first match wins
@@ -44,7 +44,7 @@ class DecadeClassifier:
         self.fmt = config.decade_format
         self.floor = config.decade_floor
 
-    def bucket(self, track: Track) -> Optional[str]:
+    def bucket(self, track: Track) -> str | None:
         year = track.release_year
         if year is None:
             return None

@@ -13,7 +13,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=7"]
+dev = ["pytest>=7", "pytest-cov>=4", "ruff>=0.6"]
 
 [project.urls]
 Homepage = "https://github.com/arlq/spotify-playlist-sorter"
@@ -30,3 +30,25 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 spotify_sorter = ["../config/*.yaml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--cov=spotify_sorter --cov-report=term-missing --cov-report=xml"
+
+[tool.coverage.run]
+source = ["spotify_sorter"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+# Regression floor — the pure classification/dedupe logic is well covered; the
+# network layer (auth/cli/sorter/library I-O) is not unit-tested. Ratchet this
+# up as coverage grows; it must never drop below the current level.
+fail_under = 30
+
+[tool.ruff]
+target-version = "py39"
+line-length = 100
+
+[tool.ruff.lint]
+extend-select = ["I", "UP", "B"]  # import-sort, pyupgrade, bugbear

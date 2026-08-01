@@ -1,8 +1,8 @@
 """Read the user's Liked Songs and the genre data needed to classify them."""
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Iterable
 
 import spotipy
 

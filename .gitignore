@@ -19,3 +19,8 @@ venv/
 .DS_Store
 .idea/
 .vscode/
+
+# Coverage artifacts
+.coverage
+coverage.xml
+htmlcov/

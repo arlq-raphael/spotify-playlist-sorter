@@ -1,5 +1,7 @@
 # spotify-playlist-sorter
 
+[![CI](https://github.com/arlq-raphael/spotify-playlist-sorter/actions/workflows/ci.yml/badge.svg)](https://github.com/arlq-raphael/spotify-playlist-sorter/actions/workflows/ci.yml)
+
 Sort your Spotify **Liked Songs** into tidy per-**genre** and per-**decade** playlists — automatically,
 and idempotently (re-run any time to file only what's new).
 
