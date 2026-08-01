@@ -21,6 +21,7 @@ def test_apply_removals_unsaves_and_purges_from_playlists():
     playlists = {
         "p1": {"name": "Rock", "owner_id": "me", "tracks": ["keep", "dropA"]},
         "p2": {"name": "Jazz", "owner_id": "me", "tracks": ["dropB"]},
+        "p3": {"name": "Untouched", "owner_id": "me", "tracks": ["keep"]},  # nothing to purge
     }
     api = MockAPI(saved=saved, playlists=playlists).register()
     sp = _client()
@@ -29,6 +30,7 @@ def test_apply_removals_unsaves_and_purges_from_playlists():
     assert {t["id"] for t in api.saved} == {"keep"}          # un-saved
     assert api.playlists["p1"]["tracks"] == ["keep"]         # purged from Rock
     assert api.playlists["p2"]["tracks"] == []               # purged from Jazz
+    assert api.playlists["p3"]["tracks"] == ["keep"]         # skipped (no matches)
     assert any("un-saved 2" in a for a in actions)
 
 

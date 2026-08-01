@@ -1,13 +1,22 @@
 import responses
 import spotipy
-from spotify_api import BASE, MockAPI, saved_track  # noqa: F401
+from spotify_api import MockAPI, saved_track
 
 from spotify_sorter.library import (
     Track,
+    _year_from_release_date,
     attach_genres,
     fetch_artist_genres,
     fetch_liked_tracks,
 )
+
+
+def test_year_from_release_date():
+    assert _year_from_release_date("1999-05-01") == 1999
+    assert _year_from_release_date("2007") == 2007
+    assert _year_from_release_date(None) is None
+    assert _year_from_release_date("") is None
+    assert _year_from_release_date("bad-date") is None
 
 
 def _client():

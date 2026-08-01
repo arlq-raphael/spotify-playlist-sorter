@@ -1,7 +1,22 @@
 """Unit tests for classification — no Spotify credentials or network needed."""
-from spotify_sorter.classify import DecadeClassifier, GenreClassifier
+import pytest
+
+from spotify_sorter.classify import DecadeClassifier, GenreClassifier, build_classifiers
 from spotify_sorter.config import Config
 from spotify_sorter.library import Track
+
+
+def test_build_classifiers_unknown_dimension_exits():
+    with pytest.raises(SystemExit):
+        build_classifiers(Config.load(), ["nonsense"])
+
+
+def test_build_classifiers_respects_decades_disabled():
+    cfg = Config.load()
+    cfg.decades_enabled = False
+    assert [c.dimension for c in build_classifiers(cfg, ["genre"])] == ["genre"]
+    with pytest.raises(SystemExit):
+        build_classifiers(cfg, ["decade"])  # disabled -> unavailable
 
 
 def _track(genres=(), year=None):

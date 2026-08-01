@@ -50,8 +50,42 @@ def test_cli_auth(monkeypatch, capsys):
     assert "Authenticated" in capsys.readouterr().out
 
 
+@responses.activate
+def test_cli_sort_decade_only_reports_skips(monkeypatch, capsys):
+    # a track with no parseable release year -> skipped when sorting by decade only
+    no_year = {"id": "t1", "name": "n", "artists": [{"id": "a1", "name": "A"}],
+               "album": {"release_date": ""}, "duration_ms": 200000}
+    _use(monkeypatch, MockAPI(saved=[no_year]))
+    assert main(["sort", "-d", "decade", "--dry-run"]) == 0
+    assert "matched no dimension" in capsys.readouterr().out
+
+
+@responses.activate
+def test_cli_dedupe_reports_pairs_and_unresolved(monkeypatch, capsys):
+    saved = [
+        saved_track("a", "Song"), saved_track("b", "Song - Remastered 2011"),  # resolved pair
+        saved_track("c", "Tune - Remix"), saved_track("d", "Tune - Radio Edit"),  # unresolved
+    ]
+    _use(monkeypatch, MockAPI(saved=saved))
+    assert main(["dedupe"]) == 0
+    out = capsys.readouterr().out
+    assert "Version pairs" in out and "Unresolved" in out
+
+
+@responses.activate
+def test_cli_dedupe_no_duplicates(monkeypatch, capsys):
+    _use(monkeypatch, MockAPI(saved=[saved_track("a", "One"), saved_track("b", "Two")]))
+    assert main(["dedupe"]) == 0
+    assert "0 redundant copies" in capsys.readouterr().out
+
+
 def test_cli_no_command_shows_help():
     assert main([]) == 1
+
+
+def test_main_module_is_importable():
+    import importlib
+    assert importlib.import_module("spotify_sorter.__main__") is not None
 
 
 def test_load_dotenv(monkeypatch, tmp_path):

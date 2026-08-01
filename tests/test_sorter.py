@@ -27,6 +27,13 @@ def test_plan_places_by_genre_and_decade():
     assert plan.total_placements == 4
 
 
+def test_plan_add_dedupes_within_playlist():
+    plan = Plan()
+    plan.add("Rock", "t1")
+    plan.add("Rock", "t1")  # same track twice -> kept once
+    assert plan.by_playlist["Rock"] == ["t1"] and plan.total_placements == 1
+
+
 def test_plan_records_skips():
     cfg = Config.load()
     # decade-only classifier + a track with no release year -> skipped
@@ -61,6 +68,30 @@ def test_apply_dry_run_changes_nothing():
     actions = Sorter(_client(), Config.load()).apply(plan, dry_run=True)
     assert any("[dry-run] CREATE" in a for a in actions)
     assert api.playlists == {}  # nothing created
+
+
+@responses.activate
+def test_apply_dry_run_add_to_existing_playlist():
+    api = MockAPI(playlists={"p1": {"name": "Rock", "owner_id": "me", "tracks": ["old"]}}).register()
+    plan = Plan()
+    plan.add("Rock", "new1")
+    actions = Sorter(_client(), Config.load()).apply(plan, dry_run=True)
+    assert any("[dry-run] ADD" in a for a in actions)
+    assert api.playlists["p1"]["tracks"] == ["old"]  # unchanged
+
+
+@responses.activate
+def test_existing_playlists_paginates_over_50():
+    pls = {f"p{i}": {"name": f"N{i}", "owner_id": "me", "tracks": []} for i in range(120)}
+    MockAPI(playlists=pls).register()
+    assert len(Sorter(_client(), Config.load())._existing_playlists()) == 120
+
+
+@responses.activate
+def test_playlist_track_ids_paginates_over_100():
+    tracks = [f"t{i}" for i in range(250)]
+    MockAPI(playlists={"p1": {"name": "Big", "owner_id": "me", "tracks": tracks}}).register()
+    assert len(Sorter(_client(), Config.load())._playlist_track_ids("p1")) == 250
 
 
 @responses.activate
