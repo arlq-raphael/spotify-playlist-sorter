@@ -30,9 +30,10 @@ granular); its API needs a token, a `User-Agent`, and 60 req/min pacing.
   granular styles)** → **Spotify (artist genres)**. This keeps ISRC precise while still using Discogs
   styles for non-ISRC tracks. MusicBrainz is free but requires a `User-Agent` and **1 req/sec** pacing;
   it is cached like Discogs.
-- **Discogs text query:** `GET /database/search?type=release&artist=<a>&track=<t>&token=<tok>`, take the
-  first result's `genre` + `style`, lowercased + deduped. `track` chosen over `release_title` (we match
-  songs, not albums); best-hit only, misses fall through.
+- **Discogs text query (via the SDK):** `client.search(type="release", artist=<a>, track=<t>)`; read the
+  first result's `genre` + `style` off the search result (avoids a follow-up fetch), lowercased +
+  deduped. Searching by `track` (not `release_title`) since we match songs, not albums; best-hit only,
+  misses fall through. The SDK handles the token, `User-Agent`, and rate limiting.
 - **Grouping via Discogs' two levels:** the Discogs provider returns both the broad `genre` and the
   granular `style`. Because Discogs `genre` is itself a coarse parent (e.g. *Deep House* is a style of
   *Electronic*), it provides reliable top-level grouping straight from the data. So bucket rules can lean
