@@ -13,7 +13,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=7", "pytest-cov>=4", "ruff>=0.6"]
+dev = ["pytest>=7", "pytest-cov>=4", "ruff>=0.6", "responses>=0.25"]
 
 [project.urls]
 Homepage = "https://github.com/arlq/spotify-playlist-sorter"
@@ -41,10 +41,10 @@ branch = true
 
 [tool.coverage.report]
 show_missing = true
-# Regression floor — the pure classification/dedupe logic is well covered; the
-# network layer (auth/cli/sorter/library I-O) is not unit-tested. Ratchet this
-# up as coverage grows; it must never drop below the current level.
-fail_under = 30
+# Regression floor. The network layer is tested against a `responses`-backed mock
+# of the Spotify Web API (see tests/spotify_api.py), so coverage is high. Keep this
+# just below the current level; raise it as coverage grows — never lower it.
+fail_under = 97
 
 [tool.ruff]
 target-version = "py39"

@@ -25,7 +25,8 @@ def test_normalize_key_collapses_versions_and_credits():
 def test_version_tag_detection():
     assert version_tag("True - 2003 Remaster")
     assert version_tag("Mad About You - Live 2012")
-    assert version_tag("Still Loving You") is None
+    assert version_tag("Still Loving You") is None            # no " - " at all
+    assert version_tag("Song - Interlude") is None            # " - " but not a version tag
     assert version_tag("Satta Massagana - Original Jamaican Mix")
 
 
