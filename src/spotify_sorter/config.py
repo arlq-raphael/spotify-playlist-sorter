@@ -4,7 +4,6 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
 
 import yaml
 
@@ -23,15 +22,15 @@ class Config:
     genre_buckets: list[Bucket]
     decades_enabled: bool = True
     decade_format: str = "{decade}s"
-    decade_floor: Optional[int] = 1950
-    unmatched_genre_bucket: Optional[str] = "Other"
-    no_genre_bucket: Optional[str] = "Unknown Genre"
+    decade_floor: int | None = 1950
+    unmatched_genre_bucket: str | None = "Other"
+    no_genre_bucket: str | None = "Unknown Genre"
     playlist_prefix: str = ""
     public_playlists: bool = True
     raw: dict = field(default_factory=dict)
 
     @classmethod
-    def load(cls, path: Optional[str | os.PathLike] = None) -> "Config":
+    def load(cls, path: str | os.PathLike | None = None) -> Config:
         if path:
             p = Path(path)
         else:

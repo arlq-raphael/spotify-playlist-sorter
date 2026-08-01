@@ -45,7 +45,7 @@ def _strip_title(title: str) -> str:
 def _strip_artist(artist: str) -> str:
     a = artist.lower().split(",")[0].split(" & ")[0].split(" feat")[0]
     a = _NONALNUM_RE.sub(" ", a).strip()
-    return a[4:] if a.startswith("the ") else a
+    return a.removeprefix("the ")
 
 
 def normalize_key(title: str, artist: str) -> str:
