@@ -46,9 +46,12 @@ granular); its API needs a token, a `User-Agent`, and 60 req/min pacing.
   ~zero cost. (See proposal.md.)
 - **Rate limiting:** a small token-bucket/sleep keeping ≤ ~1 req/sec; on HTTP 429 honour `Retry-After`
   (and `X-Discogs-Ratelimit-Remaining`). Discogs personal-token limit is 60/min.
-- **Caching:** in-memory dict keyed by normalized `artist|title`; optionally persisted to a JSON file
-  (`.discogs-cache.json`, git-ignored) so re-runs are instant. Cache stores the resolved genre list
-  (including empty, to avoid re-querying known misses).
+- **Caching (persistent, across runs):** a JSON cache file (`.genre-cache.json`, git-ignored) shared by
+  both external providers, keyed by lookup key (ISRC, or normalized `artist|title`) and storing the
+  resolved genre list — **including empty results**, so known misses aren't re-queried. Loaded at start
+  and written back on completion; re-runs are near-instant and only new/uncached tracks hit the API.
+  Deleting the file forces a full refresh. In tests the cache path is pointed at a temp dir so runs are
+  isolated.
 - **User-Agent:** required by Discogs (403 otherwise) — send `spotify-playlist-sorter/<version>
   (+github url)`.
 - **Config:** `genre_providers: [musicbrainz, discogs, spotify]` (order matters; `musicbrainz` is the
@@ -71,5 +74,5 @@ granular); its API needs a token, a `User-Agent`, and 60 req/min pacing.
 
 ## Open Questions
 
-- Persist the cache across runs by default, or keep it in-memory only? Leaning persisted JSON (git-ignored)
-  since Discogs-first benefits most from it; revisit if it complicates testing.
+- _None open._ (Cache persistence — resolved: a git-ignored JSON cache persisted across runs, see the
+  caching decision above.)

@@ -18,7 +18,7 @@
 
 - [ ] 4.1 Add `python3-discogs-client` to dependencies; construct the client with `DISCOGS_TOKEN` + a unique `User-Agent`
 - [ ] 4.2 `DiscogsGenreProvider`: `search(artist, title, type=release)`, take best hit's `genre` + `style`; rely on the SDK's built-in rate limiting (verify 429 backoff)
-- [ ] 4.3 Cache external lookups by key (ISRC, or normalized `artist|title`) — in-memory + optional git-ignored JSON persist; cache misses too (shared by both external providers)
+- [ ] 4.3 Shared persistent cache for both external providers: keyed by ISRC / normalized `artist|title`, caches misses too, persisted to a git-ignored `.genre-cache.json` across runs (load at start, write on completion; cache path overridable for tests); add `.genre-cache.json` to `.gitignore`
 - [ ] 4.4 Skip with a notice when no token; return empty on no match
 
 ## 5. Wiring
@@ -29,6 +29,6 @@
 ## 6. Tests & docs
 
 - [ ] 6.1 Extend the `responses` mock for `musicbrainz.org/ws/2/isrc/...` and `api.discogs.com/database/search`
-- [ ] 6.2 Tests: provider order/first-non-empty, ISRC→genres, ISRC no-result → fall-through, no-ISRC skip, Discogs match → styles, no-token skip, caching (queried once), rate-limit retry
+- [ ] 6.2 Tests: provider order/first-non-empty, ISRC→genres, ISRC no-result → fall-through, no-ISRC skip, Discogs match → styles, no-token skip, in-run caching (queried once), persistent cache reused on a second run (no API call), rate-limit retry
 - [ ] 6.3 README: "Genre sources" section (ISRC→MusicBrainz → Discogs → Spotify order, Discogs token setup, speed trade-off)
 - [ ] 6.4 Run `pytest` (keep coverage ≥ floor) and `openspec validate add-discogs-genre-fallback --strict`

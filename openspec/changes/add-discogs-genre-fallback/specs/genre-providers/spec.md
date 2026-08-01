@@ -77,10 +77,15 @@ signals the limit is reached.
 - **WHEN** an external source responds that the rate limit is exceeded
 - **THEN** the source waits and retries rather than failing the run
 
-### Requirement: Cache external lookups
-External genre lookups SHALL be cached by their query key (ISRC, or artist+title) so the same lookup is
-not repeated within a run, and ideally across runs, bounding the number of API calls.
+### Requirement: Persistently cache external lookups
+External genre lookups SHALL be cached by their query key (ISRC, or artist+title), including empty
+results, so the same lookup is not repeated within a run. The cache SHALL persist across runs so a
+later run does not re-query tracks that were previously resolved or previously missed.
 
-#### Scenario: Repeated lookup served from cache
-- **WHEN** two tracks resolve to the same lookup key
+#### Scenario: Repeated lookup served from cache within a run
+- **WHEN** two tracks resolve to the same lookup key in one run
 - **THEN** the external API is queried at most once for that key
+
+#### Scenario: Later run reuses the persisted cache
+- **WHEN** a track's lookup key was resolved (or missed) in a previous run and appears again
+- **THEN** the result is served from the persisted cache without querying the API
