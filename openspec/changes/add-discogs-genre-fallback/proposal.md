@@ -44,6 +44,7 @@ precisely to the tool's buckets, so using it as a genre source materially improv
 - New optional credential `DISCOGS_TOKEN` (documented in `.env.example` / README); `config/genres.yaml`
   gains a `genre_providers` list and an optional Discogs section (user-agent, timeout).
 - The track model captures each track's **ISRC** (`external_ids.isrc`) from the saved-tracks response.
-- Uses the `requests` library (already an indirect dependency via spotipy) for both Discogs and
-  MusicBrainz (MusicBrainz needs no token, only a `User-Agent`). Tests mock `api.discogs.com` and
-  `musicbrainz.org` with the existing `responses` setup.
+- Adds **`python3-discogs-client`** (the maintained Discogs SDK) as a runtime dependency; MusicBrainz is
+  a small hand-rolled `requests` client (no new dep; `requests` is already present via spotipy, and it
+  needs only a `User-Agent`, no token). Both use `requests`, so tests mock `api.discogs.com` and
+  `musicbrainz.org` at the HTTP layer with the existing `responses` setup.

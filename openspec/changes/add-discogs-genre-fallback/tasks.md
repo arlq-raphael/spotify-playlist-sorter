@@ -14,12 +14,12 @@
 - [ ] 3.1 Add a `musicbrainz.py` client: `genres_for_isrc(isrc) -> list[str]` (`GET /ws/2/isrc/{isrc}?inc=genres+tags&fmt=json`), required `User-Agent`, pace to 1 req/sec, honour 503/`Retry-After`
 - [ ] 3.2 `MusicBrainzGenreProvider`: resolve tracks that have an ISRC; skip those without one
 
-## 4. Discogs provider
+## 4. Discogs provider (via `python3-discogs-client` SDK)
 
-- [ ] 4.1 Add a `discogs.py` client: `search(artist, title) -> list[str]` (genre + style), required `User-Agent`, `token` from `DISCOGS_TOKEN`
-- [ ] 4.2 Rate limiting: pace to ≤60/min; on 429 honour `Retry-After` / `X-Discogs-Ratelimit`
-- [ ] 4.3 Cache external lookups by key (ISRC, or normalized `artist|title`) — in-memory + optional git-ignored JSON persist; cache misses too
-- [ ] 4.4 `DiscogsGenreProvider`: skip with a notice when no token; return empty on no match
+- [ ] 4.1 Add `python3-discogs-client` to dependencies; construct the client with `DISCOGS_TOKEN` + a unique `User-Agent`
+- [ ] 4.2 `DiscogsGenreProvider`: `search(artist, title, type=release)`, take best hit's `genre` + `style`; rely on the SDK's built-in rate limiting (verify 429 backoff)
+- [ ] 4.3 Cache external lookups by key (ISRC, or normalized `artist|title`) — in-memory + optional git-ignored JSON persist; cache misses too (shared by both external providers)
+- [ ] 4.4 Skip with a notice when no token; return empty on no match
 
 ## 5. Wiring
 

@@ -46,7 +46,12 @@ granular); its API needs a token, a `User-Agent`, and 60 req/min pacing.
 - **Config:** `genre_providers: [musicbrainz, discogs, spotify]` (order matters; `musicbrainz` is the
   ISRC-exact source). Unknown names error early. A provider named `discogs` with no `DISCOGS_TOKEN`
   prints a notice and is skipped; `musicbrainz` needs no token.
-- **HTTP client:** use `requests` directly (already present via spotipy) rather than adding a dep.
+- **Clients:** Discogs via the maintained **`python3-discogs-client`** SDK (import `discogs_client`) — it
+  handles token auth, `User-Agent`, and rate limiting, and exposes `search(...)` with `genre`/`style`.
+  MusicBrainz is **hand-rolled on `requests`** (a single ISRC endpoint; the standard SDK `musicbrainzngs`
+  uses `urllib`, which our `responses` HTTP-level tests cannot intercept — not worth the fidelity loss
+  for one GET). Both paths ultimately use `requests`, so `responses` mocking stays uniform across tests.
+  Net dependency change: `+python3-discogs-client` (MusicBrainz adds none; `requests` is already present).
 
 ## Risks / Trade-offs
 
