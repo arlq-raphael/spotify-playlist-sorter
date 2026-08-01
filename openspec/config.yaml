@@ -1,0 +1,57 @@
+schema: spec-driven
+
+context: |
+  Project: spotify-playlist-sorter — a Python CLI that sorts a user's Spotify
+  Liked Songs into per-genre and per-decade playlists (extensible to more
+  "dimensions" later, e.g. mood/tempo/language).
+
+  Tech stack: Python 3.9+, spotipy (Spotify Web API + OAuth), PyYAML, argparse.
+  Packaging: src/ layout, setuptools, console_script `spotify-sorter`. Tests: pytest.
+
+  Architecture:
+    - auth.py      OAuth via spotipy (SPOTIPY_* env vars)
+    - library.py   fetch Liked Songs + artist genres + album release years
+    - classify.py  pluggable Classifier per dimension (GenreClassifier, DecadeClassifier)
+    - sorter.py    plan target playlists, then create/populate idempotently
+    - config.py    load config/genres.yaml (editable genre→bucket rules)
+    - cli.py       `spotify-sorter sort [--dimensions ...] [--dry-run] [--limit N]`
+
+  Conventions & principles:
+    - Deterministic classification from Spotify's own data (no LLM); genre from
+      artist genres mapped via ordered substring rules (first match wins),
+      decade from album release year.
+    - Idempotent: playlists matched by name, only missing tracks added; re-runnable.
+    - New dimensions are added as a Classifier subclass + entry in build_classifiers.
+    - Standard-library-only runtime beyond spotipy/PyYAML; no network in unit tests.
+    - Public MIT repo; never commit secrets (.env / .cache are git-ignored).
+
+# Project context (optional)
+# This is shown to AI when creating artifacts.
+# Add your tech stack, conventions, style guides, domain knowledge, etc.
+# Example:
+#   context: |
+#     Tech stack: TypeScript, React, Node.js
+#     We use conventional commits
+#     Domain: e-commerce platform
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always include a "Non-goals" section
+#     tasks:
+#       - Break tasks into chunks of max 2 hours
+
+# Per-operation guidance (optional)
+# Add advisory guidance for how apply and archive work should be conducted.
+# This is separate from artifact rules above.
+# Example:
+#   operations:
+#     apply:
+#       guidance:
+#         - Keep test summaries concise
+#     archive:
+#       guidance:
+#         - Summarize the archive outcome before finishing

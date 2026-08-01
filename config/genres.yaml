@@ -1,0 +1,65 @@
+# ---------------------------------------------------------------------------
+# spotify-playlist-sorter configuration
+#
+# Genre classification is deterministic: for each track we collect the Spotify
+# genres of its artists, then walk `genre_buckets` TOP-TO-BOTTOM and pick the
+# FIRST bucket whose any `match` substring appears in any of those genres.
+# => Order matters: put more specific buckets ABOVE more generic ones.
+#
+# Edit freely — this is just a sensible default. `match` values are matched
+# case-insensitively as substrings against Spotify genre strings.
+# ---------------------------------------------------------------------------
+
+options:
+  # Where a track's artists have genres but none match a bucket:
+  unmatched_genre_bucket: "Other"   # set to null to leave such tracks unsorted
+  # Where Spotify returns NO genres for any artist (common for small artists):
+  no_genre_bucket: "Unknown Genre"  # set to null to leave them unsorted
+  # Prefix applied to every created playlist name (e.g. "🎧 ") — "" for none.
+  playlist_prefix: ""
+  public_playlists: true
+
+# --- Decade classification (by album release year) -------------------------
+decades:
+  enabled: true
+  format: "{decade}s"      # e.g. 1970 -> "1970s"
+  # Years before this are grouped into the earliest decade (or set floor: null
+  # to leave pre-floor tracks unsorted by decade).
+  floor: 1950
+
+# --- Genre buckets (ordered: specific first) -------------------------------
+genre_buckets:
+  - name: "Ragga / Dancehall"
+    match: [dancehall, ragga]
+  - name: "Reggae Roots & Dub"
+    match: [reggae, dub, ska, rocksteady, roots]
+  - name: "French Rap"
+    match: [french hip hop, rap francais, rap conscient, pop urbaine]
+  - name: "Hip-Hop / Rap"
+    match: [hip hop, rap, trap, drill, grime]
+  - name: "Trip-Hop / Downtempo"
+    match: [trip hop, downtempo, chillhop, nu jazz, abstract]
+  - name: "House / Electro"
+    match: [house, "french touch", nu disco, disco house, electro]
+  - name: "Techno / EDM"
+    match: [techno, edm, trance, dubstep, "drum and bass", rave, hardstyle]
+  - name: "Jazz"
+    match: [jazz, bebop, swing, bossa nova]
+  - name: "Funk / Soul"
+    match: [funk, soul, motown, disco, boogie, r&b, rhythm and blues]
+  - name: "Reggaeton / Latin"
+    match: [reggaeton, latin, salsa, cumbia, samba, afrobeat, afro]
+  - name: "Blues"
+    match: [blues, delta blues]
+  - name: "Metal"
+    match: [metal, metalcore, hardcore]
+  - name: "Punk / New Wave"
+    match: [punk, new wave, post-punk, synthpop, darkwave, coldwave]
+  - name: "Rock"
+    match: [rock, grunge, indie, britpop, psychedelic]
+  - name: "Pop"
+    match: [pop, chanson, variété, variete]
+  - name: "Electronic"
+    match: [electronic, ambient, idm, synthwave]
+  - name: "World"
+    match: [world, folk, traditional]
