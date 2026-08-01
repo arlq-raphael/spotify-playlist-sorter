@@ -33,6 +33,13 @@ granular); its API needs a token, a `User-Agent`, and 60 req/min pacing.
 - **Discogs text query:** `GET /database/search?type=release&artist=<a>&track=<t>&token=<tok>`, take the
   first result's `genre` + `style`, lowercased + deduped. `track` chosen over `release_title` (we match
   songs, not albums); best-hit only, misses fall through.
+- **Grouping via Discogs' two levels:** the Discogs provider returns both the broad `genre` and the
+  granular `style`. Because Discogs `genre` is itself a coarse parent (e.g. *Deep House* is a style of
+  *Electronic*), it provides reliable top-level grouping straight from the data. So bucket rules can lean
+  on the broad `genre` for the "bigger genre" and treat `style` as optional refinement when the config
+  defines finer buckets — reducing reliance on hand-written substring rules. Both values are returned;
+  the ordered bucket config decides which wins. (A richer default style→bucket mapping seeded from the
+  Discogs/MusicBrainz taxonomy is tracked as a follow-up, out of scope here.)
 - **Why not acoustic fingerprinting:** it needs audio Spotify no longer exposes (previews removed
   2024-11) and would re-identify tracks whose identity we already have — ISRC delivers the precision at
   ~zero cost. (See proposal.md.)
