@@ -80,6 +80,15 @@ def test_cli_dedupe_no_duplicates(monkeypatch, capsys):
     assert "0 redundant copies" in capsys.readouterr().out
 
 
+def test_cli_configure_non_interactive():
+    # $XDG_CONFIG_HOME is redirected to a tmp dir by the autouse isolation fixture.
+    from spotify_sorter.config import Config, _user_config_path
+    assert main(["configure", "--non-interactive", "--prefix", "CLI ", "--private"]) == 0
+    assert _user_config_path().is_file()
+    c = Config.load()
+    assert c.playlist_prefix == "CLI " and c.public_playlists is False
+
+
 def test_cli_no_command_shows_help():
     assert main([]) == 1
 

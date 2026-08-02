@@ -44,6 +44,22 @@ def build_parser() -> argparse.ArgumentParser:
     dd.add_argument("--limit", "-n", type=int, default=None,
                     help="Only scan the N most-recent liked songs.")
 
+    cfg = sub.add_parser("configure", help="Interactively create your user config + credentials.")
+    cfg.add_argument("--prefix", default=None, help="Playlist name prefix.")
+    cfg.add_argument("--public", dest="public", action="store_const", const=True, default=None,
+                     help="Make created playlists public.")
+    cfg.add_argument("--private", dest="public", action="store_const", const=False,
+                     help="Make created playlists private.")
+    cfg.add_argument("--providers", default=None, help="Comma-separated genre sources, in order.")
+    cfg.add_argument("--decade-floor", type=int, default=None, help="Earliest decade year.")
+    cfg.add_argument("--discogs-token", default=None, help="Discogs token (stored in credentials).")
+    cfg.add_argument("--spotify-client-id", default=None)
+    cfg.add_argument("--spotify-client-secret", default=None)
+    cfg.add_argument("--spotify-redirect", default=None, help="Spotify redirect URI.")
+    cfg.add_argument("--force", action="store_true", help="Overwrite an existing user config.")
+    cfg.add_argument("--non-interactive", action="store_true",
+                     help="Write from flags/defaults without prompting.")
+
     sub.add_parser("auth", help="Run the OAuth flow / refresh the cached token and exit.")
     return p
 
@@ -137,9 +153,15 @@ def cmd_dedupe(args) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    _load_dotenv()
+    from .credentials import load_into_env
+
+    _load_dotenv()          # project-local .env fills unset vars first…
+    load_into_env()         # …then the per-user credentials file fills what remains.
     parser = build_parser()
     args = parser.parse_args(argv)
+    if args.command == "configure":
+        from .configure import run_configure
+        return run_configure(args)
     if args.command == "auth":
         from .auth import get_client
         get_client().current_user()
