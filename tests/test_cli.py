@@ -10,6 +10,7 @@ from spotify_sorter.cli import _load_dotenv, main
 
 def _use(monkeypatch, api: MockAPI):
     api.register()
+    monkeypatch.delenv("DISCOGS_TOKEN", raising=False)  # keep the Discogs provider skipped in CLI tests
     sp = spotipy.Spotify(auth="test-token")
     monkeypatch.setattr(auth_mod, "get_client", lambda: sp)
     return sp

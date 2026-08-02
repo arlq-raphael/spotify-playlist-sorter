@@ -15,6 +15,7 @@ class Track:
     artist_names: list[str]
     release_year: int | None
     duration_ms: int | None = None
+    isrc: str | None = None
     genres: list[str] = field(default_factory=list)  # filled in later
 
     @property
@@ -57,6 +58,7 @@ def fetch_liked_tracks(sp: spotipy.Spotify, limit: int | None = None) -> list[Tr
                     artist_names=[a.get("name", "") for a in artists],
                     release_year=_year_from_release_date(album.get("release_date")),
                     duration_ms=t.get("duration_ms"),
+                    isrc=(t.get("external_ids") or {}).get("isrc"),
                 )
             )
             if limit and len(tracks) >= limit:

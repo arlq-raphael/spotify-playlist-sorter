@@ -104,6 +104,23 @@ name `prefix`, public/private playlists, and the decade `floor`.
 > **Note:** Spotify returns genres per *artist*, not per track, and smaller artists often have none —
 > those land in the `no_genre_bucket` ("Unknown Genre") so nothing is silently dropped.
 
+## Genre sources
+
+Genres are resolved from an **ordered chain of sources** (`genre_providers` in `config/genres.yaml`);
+the first source with a hit for a track wins:
+
+1. **MusicBrainz** — exact match by the track's **ISRC** (a globally unique recording id). No token
+   needed, paced to ~1 req/s.
+2. **Discogs** — searches by artist + title and uses the release's granular **styles** (e.g. *Deep
+   House*, *Roots Reggae*). Requires a free `DISCOGS_TOKEN` (see `.env.example`); **skipped if unset**.
+3. **Spotify** — the artist's genres (batched, always available, no extra setup).
+
+Lookups are cached to a git-ignored **`.genre-cache.json`**, so re-runs are near-instant and only new
+tracks hit the APIs (delete the file to force a refresh).
+
+> **Speed vs. granularity:** MusicBrainz/Discogs are rate-limited (~1/s and 60/min), so the *first* run
+> on a large library is slow. Put `spotify` first in `genre_providers` if you prefer speed.
+
 ## Extending it
 
 Dimensions are pluggable. A new one (mood, tempo, language, …) is just a small `Classifier` subclass in

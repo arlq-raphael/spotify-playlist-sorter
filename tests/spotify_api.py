@@ -141,3 +141,44 @@ class MockAPI:
         r.add_callback(r.POST, _pat("/playlists/[^/]+/items"), callback=self._add)
         r.add_callback(r.DELETE, _pat("/playlists/[^/]+/items"), callback=self._remove)
         return self
+
+
+def mock_musicbrainz(isrc_genres: dict):
+    """Register the MusicBrainz ISRC endpoint. `isrc_genres`: {isrc: [genre,...]}; a
+    missing ISRC returns 404."""
+    def cb(request):
+        isrc = urlparse(request.url).path.rstrip("/").split("/")[-1]
+        genres = isrc_genres.get(isrc)
+        if genres is None:
+            return 404, {}, json.dumps({"error": "Not Found"})
+        recordings = [{"genres": [{"name": g, "count": 1} for g in genres], "tags": []}]
+        return 200, {}, json.dumps({"isrc": isrc, "recordings": recordings})
+
+    responses.add_callback(
+        responses.GET, re.compile(r"^https://musicbrainz\.org/ws/2/isrc/[^/?]+"), callback=cb
+    )
+
+
+def mock_discogs(search_results: dict):
+    """Register the Discogs search endpoint. `search_results`: {"artist|title":
+    {"genre": [...], "style": [...]}}; a missing key returns no results."""
+    def norm(s):
+        return " ".join(s.lower().split())
+
+    def cb(request):
+        q = parse_qs(urlparse(request.url).query)
+        key = f"{norm(q.get('artist', [''])[0])}|{norm(q.get('track', [''])[0])}"
+        hit = search_results.get(key)
+        results = []
+        if hit:
+            results = [{"id": 1, "type": "release", "title": "X",
+                        "resource_url": "https://api.discogs.com/releases/1",
+                        "genre": hit.get("genre", []), "style": hit.get("style", [])}]
+        return 200, {}, json.dumps(
+            {"results": results,
+             "pagination": {"items": len(results), "page": 1, "pages": 1, "per_page": 50}}
+        )
+
+    responses.add_callback(
+        responses.GET, re.compile(r"^https://api\.discogs\.com/database/search"), callback=cb
+    )
