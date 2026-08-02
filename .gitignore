@@ -4,6 +4,9 @@
 .cache-*
 *.token
 
+# Persistent genre-lookup cache
+.genre-cache.json
+
 # Python
 __pycache__/
 *.pyc

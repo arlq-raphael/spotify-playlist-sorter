@@ -50,9 +50,11 @@ def build_parser() -> argparse.ArgumentParser:
 
 def cmd_sort(args) -> int:
     from .auth import get_client
+    from .cache import GenreCache
     from .classify import build_classifiers
     from .config import Config
-    from .library import attach_genres, fetch_artist_genres, fetch_liked_tracks
+    from .library import fetch_liked_tracks
+    from .providers import build_providers, resolve_genres
     from .sorter import Sorter
 
     config = Config.load(args.config)
@@ -64,9 +66,10 @@ def cmd_sort(args) -> int:
     print(f"  {len(tracks)} tracks")
 
     if "genre" in args.dimensions:
-        print("Fetching artist genres…", flush=True)
-        all_artist_ids = [a for t in tracks for a in t.artist_ids]
-        attach_genres(tracks, fetch_artist_genres(sp, all_artist_ids))
+        print("Resolving genres (" + " → ".join(config.genre_providers) + ")…", flush=True)
+        cache = GenreCache(config.cache_path)
+        resolve_genres(tracks, build_providers(config, sp, cache))
+        cache.save()
 
     classifiers = build_classifiers(config, args.dimensions)
     plan = sorter.plan(tracks, classifiers)

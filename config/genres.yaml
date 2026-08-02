@@ -19,6 +19,24 @@ options:
   playlist_prefix: ""
   public_playlists: true
 
+# --- Genre sources (ordered: first provider with a non-empty result wins) ---
+# Available: musicbrainz (exact ISRC lookup), discogs (artist+title -> genre/style),
+# spotify (artist genres, batched, always available).
+genre_providers: [musicbrainz, discogs, spotify]
+
+discogs:
+  # The Discogs personal access token is read from the DISCOGS_TOKEN env var, not stored here.
+  # Without it, the discogs provider is skipped and resolution falls through to the next source.
+  user_agent: "spotify-playlist-sorter/0.1 +https://github.com/arlq-raphael/spotify-playlist-sorter"
+
+musicbrainz:
+  # MusicBrainz needs no token, only a unique User-Agent.
+  user_agent: "spotify-playlist-sorter/0.1 +https://github.com/arlq-raphael/spotify-playlist-sorter"
+
+cache:
+  # Persistent cache of external genre lookups (git-ignored) so re-runs don't re-query.
+  path: ".genre-cache.json"
+
 # --- Decade classification (by album release year) -------------------------
 decades:
   enabled: true

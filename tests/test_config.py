@@ -23,3 +23,20 @@ def test_load_falls_back_to_cwd(monkeypatch, tmp_path):
     (tmp_path / "config" / "genres.yaml").write_text("genre_buckets: []\n")
     monkeypatch.chdir(tmp_path)
     assert Config.load().genre_buckets == []
+
+
+def test_no_config_anywhere_raises(monkeypatch, tmp_path):
+    monkeypatch.setattr(config_mod, "_DEFAULT_CONFIG", tmp_path / "nope.yaml")
+    monkeypatch.chdir(tmp_path)  # no ./config/ here either
+    with pytest.raises(FileNotFoundError):
+        Config.load()
+
+
+def test_user_config_deep_merges_over_bundled_defaults(tmp_path):
+    # A partial user config overrides only what it sets and inherits the rest.
+    p = tmp_path / "u.yaml"
+    p.write_text("options:\n  playlist_prefix: 'X '\n")
+    c = Config.load(str(p))
+    assert c.playlist_prefix == "X "               # overridden
+    assert c.unmatched_genre_bucket == "Other"     # inherited from the bundled default
+    assert c.genre_buckets                          # inherited (non-empty)

@@ -10,6 +10,8 @@ keywords = ["spotify", "playlist", "music", "genre", "cli"]
 dependencies = [
     "spotipy>=2.23",
     "PyYAML>=6.0",
+    "requests>=2.28",
+    "python3-discogs-client>=2.7",
 ]
 
 [project.optional-dependencies]
