@@ -34,13 +34,22 @@ Two gaps in how the tool loads configuration:
   4. `--config <path>` explicit flag
 - Keep `--config` working; it becomes the top layer of the chain rather than the only
   user layer.
+- **Add a per-user credentials file** at `~/.config/spotify-sorter/credentials`
+  (honoring `$XDG_CONFIG_HOME`), separate from the preferences YAML, holding secrets
+  (`DISCOGS_TOKEN`, and optionally the Spotify app `SPOTIPY_CLIENT_ID/SECRET/REDIRECT_URI`)
+  as `KEY=VALUE` lines. It is written with owner-only permissions (`0600`) and loaded at
+  startup with precedence: real env var → project `./.env` → home credentials file. This
+  mirrors the aws-cli split of `~/.aws/config` (preferences) vs `~/.aws/credentials`
+  (secrets), and gives a globally-installed CLI a persistent per-user secret store instead
+  of a working-directory-bound `.env`.
 - **Add a `configure` command** — an interactive wizard (aws-configure-style) that
   prompts for the common settings and writes a minimal user config to the home location,
   so users never hand-write YAML. It writes only the settings the user changed (a partial
   config that keeps inheriting the rest), refuses to overwrite an existing file without
-  `--force`, and keeps secrets out of the YAML: an optional Discogs token is written to
-  `.env` as `DISCOGS_TOKEN`, never into the config. Every prompt also has a flag, and a
-  `--non-interactive` mode makes it scriptable and testable.
+  `--force`, and keeps secrets out of the YAML: the Discogs token (and, optionally, the
+  Spotify app credentials) are written to the `0600` credentials file, never into the
+  config. Every prompt also has a flag, and a `--non-interactive` mode makes it scriptable
+  and testable.
 - **BREAKING** (internal only): remove the `_DEFAULT_CONFIG` path constant and the
   `cwd/config/genres.yaml` fallback. No public CLI behaviour regresses for
   correctly-installed users; the change *fixes* wheel installs and *adds* the user-config
@@ -52,8 +61,11 @@ Two gaps in how the tool loads configuration:
 - `config-loading` — how the tool locates, layers, and loads its default and user
   configuration: the packaged default plus the home-directory / env / flag precedence
   chain, independent of installation method.
+- `credentials` — how the tool locates and loads secrets (Discogs token, Spotify app
+  credentials) from a per-user credentials file and the environment, separate from the
+  preferences config, with owner-only file permissions.
 - `config-setup` — the `configure` command that interactively generates a user config
-  at the home location and writes an optional Discogs token to `.env`.
+  at the home location and writes secrets to the credentials file.
 
 ### Modified Capabilities
 - None. (`dedupe` and `genre-providers` requirements are unchanged; they benefit from
@@ -63,13 +75,18 @@ Two gaps in how the tool loads configuration:
 
 - `src/spotify_sorter/config.py` — resource-based default loading + precedence chain.
 - `config/genres.yaml` → `src/spotify_sorter/data/genres.yaml` (moved).
+- `src/spotify_sorter/credentials.py` (new) — resolve the credentials-file path, load
+  secrets into the environment (`setdefault`) at startup, and a `0600` line-aware writer.
+- `src/spotify_sorter/cli.py` — load the credentials file alongside `.env` at startup.
 - `src/spotify_sorter/configure.py` (new) — the wizard logic (prompt/collect/write),
   wired into `cli.py` as the `configure` subcommand.
 - `pyproject.toml` — in-package `package-data` entry.
 - `tests/test_config.py` — replace cwd-fallback tests; add packaged-resource, home-config
   discovery, env-var, and precedence/merge-order tests.
+- `tests/test_credentials.py` (new) — path resolution, load precedence (env / `.env` /
+  home), `0600` permissions, line-aware update/append.
 - `tests/test_configure.py` (new) — wizard prompt handling, partial-config output,
-  `.env` token write, overwrite guard.
+  credentials-file token write, overwrite guard.
 - `README.md` — document the `configure` command, the user config location, and precedence.
 - No new runtime dependency (`importlib.resources`, XDG-path resolution, and `getpass`
   for masked token entry are all stdlib on Python 3.9+).

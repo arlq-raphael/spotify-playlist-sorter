@@ -128,6 +128,36 @@ themselves is out of scope here — tracked separately.)
 Note the deliberate asymmetry: layer 2's absence is silent (`is_file()` guard), while
 layers 3–4 raise when named-but-missing.
 
+## Credentials file (credentials)
+
+Secrets live in their own per-user file, mirroring aws-cli's `config` vs `credentials`
+split. `credentials.py` provides:
+
+- `_credentials_path()` — `$XDG_CONFIG_HOME`-or-`~/.config` → `spotify-sorter/credentials`
+  (same directory as `config.yaml`, different file).
+- `load_credentials_into_env()` — parse the `KEY=VALUE` file and `os.environ.setdefault`
+  each key, so anything already in the environment wins. Called at CLI startup **after**
+  `_load_dotenv()`, so the effective precedence is: real env → `./.env` → home credentials
+  (each layer only fills keys still unset). Reuses the existing dotenv line parser
+  (`KEY=VALUE`, `#` comments, quote-stripping).
+- `write_credential(key, value)` — line-aware upsert: replace an existing `KEY=` line or
+  append; then `os.chmod(path, 0o600)`. Create the parent dir if missing. The file is
+  created `0600` from the start (open with `opener=lambda p, f: os.open(p, f, 0o600)`), so
+  the secret is never briefly world-readable.
+
+Format is flat `KEY=VALUE` (no aws-style `[profile]` sections). Profiles are YAGNI for a
+single-Spotify-account tool; if multi-account is ever needed it becomes a follow-up that
+adds section parsing without breaking the flat file.
+
+Recognized keys: `DISCOGS_TOKEN`, `SPOTIPY_CLIENT_ID`, `SPOTIPY_CLIENT_SECRET`,
+`SPOTIPY_REDIRECT_URI`. Because they load into the environment, spotipy (`auth.py`) and the
+Discogs provider pick them up unchanged — no call-site edits beyond the startup load.
+
+**Out of scope (noted follow-up):** spotipy caches its OAuth token in a CWD `.cache`, so a
+globally-installed CLI re-auths per directory. Relocating that cache under
+`~/.config/spotify-sorter/` fits this capability's spirit but is left as a separate task to
+keep this change bounded.
+
 ## Configure command (config-setup)
 
 A new `configure` subcommand in `cli.py`, backed by `configure.py`.
@@ -140,7 +170,8 @@ A new `configure` subcommand in `cli.py`, backed by `configure.py`.
 | public playlists | `--public/--private` | `options.public_playlists` |
 | genre providers | `--providers a,b,c` | `genre_providers` |
 | earliest decade | `--decade-floor` | `decades.floor` |
-| Discogs token | `--discogs-token` | `.env` (`DISCOGS_TOKEN`), **not** the YAML |
+| Discogs token | `--discogs-token` | credentials file (`DISCOGS_TOKEN`), **not** the YAML |
+| Spotify app creds (optional) | `--spotify-client-id/-secret/-redirect` | credentials file, **not** the YAML |
 
 **Minimal output.** The wizard compares each answer to the default drawn from the bundled
 config; only *changed* values are emitted. So accepting every default writes an
@@ -154,18 +185,20 @@ in a no-prompt collector that reads only flags + defaults. Tests pass fakes — 
 stdin, no real `getpass`, and the target paths (`config.yaml`, `.env`) are redirected into
 `tmp_path`.
 
-**`.env` write is line-aware.** If `.env` exists and has a `DISCOGS_TOKEN=` line, replace
-it in place; otherwise append. Never rewrite unrelated lines. The config-path and env-path
-are parameters (default: the resolved home config, and `./.env`) so tests and power users
-can redirect them.
+**Secret writes go through `credentials.write_credential`** (line-aware upsert, `0600`),
+so the wizard shares one code path with the credentials capability. The config-path and
+credentials-path are parameters (default: the resolved home config and home credentials
+file) so tests and power users can redirect them.
 
 **Overwrite guard.** If the resolved config path exists and `--force` is not set, print
 "already exists — pass --force to overwrite" and return a non-zero exit *before* touching
-anything.
+anything. (The guard covers the preferences config; credential upserts are always in-place
+and non-destructive to unrelated keys.)
 
-**Security note.** The token is masked at entry (`getpass`), never echoed, never logged,
-and never placed in the YAML. `.env` is already gitignored. This preserves the existing
-config-vs-secrets boundary (preferences in YAML, secrets in env/`.env`).
+**Security note.** Secrets are masked at entry (`getpass`), never echoed, never logged, and
+never placed in the YAML. The credentials file is written `0600` and lives under
+`~/.config` (outside any repo). This preserves and strengthens the config-vs-secrets
+boundary (preferences in YAML, secrets in the credentials file).
 
 ## Testing strategy
 

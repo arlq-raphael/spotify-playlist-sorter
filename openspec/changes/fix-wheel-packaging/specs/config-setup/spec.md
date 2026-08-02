@@ -2,8 +2,9 @@
 
 Provides a `configure` command that helps users create their configuration without
 hand-writing YAML: an interactive wizard that collects the common settings, writes a
-minimal user config to the standard home location, and records an optional Discogs token
-in `.env` — keeping secrets out of the config file.
+minimal user config to the standard home location, and records secrets (the Discogs token
+and optionally the Spotify app credentials) in the per-user credentials file — keeping
+secrets out of the config file.
 
 ## ADDED Requirements
 
@@ -39,24 +40,31 @@ they continue to inherit from the bundled default via the config-loading precede
 - **AND** a subsequent load produces the user's prefix plus the bundled defaults for
   everything else
 
-### Requirement: Secrets are written to .env, never to the config file
+### Requirement: Secrets are written to the credentials file, never to the config file
 
-When the wizard collects a Discogs API token, the tool SHALL write it to a `.env` file as
-`DISCOGS_TOKEN` and SHALL NOT write the token into the YAML config. Token entry SHALL be
-masked (not echoed to the terminal).
+When the wizard collects secrets — the Discogs API token, and optionally the Spotify app
+credentials — the tool SHALL write them to the per-user credentials file (per the
+credentials capability: `KEY=VALUE`, `0600`, in-place key update) and SHALL NOT write any
+secret into the YAML config. Secret entry SHALL be masked (not echoed to the terminal).
 
-#### Scenario: Discogs token recorded in .env
+#### Scenario: Discogs token recorded in the credentials file
 - **WHEN** the user opts to enable Discogs and enters a token
-- **THEN** the token is written to `.env` as `DISCOGS_TOKEN=...`
+- **THEN** the token is written to the credentials file as `DISCOGS_TOKEN=...`
 - **AND** the token does not appear in the written YAML config
 
-#### Scenario: Existing .env token updated in place
-- **WHEN** `.env` already contains a `DISCOGS_TOKEN` line and the user enters a new token
+#### Scenario: Optional Spotify app credentials recorded
+- **WHEN** the user opts to set up Spotify app credentials and enters them
+- **THEN** they are written to the credentials file as `SPOTIPY_CLIENT_ID` /
+  `SPOTIPY_CLIENT_SECRET` / `SPOTIPY_REDIRECT_URI`
+- **AND** they do not appear in the written YAML config
+
+#### Scenario: Existing credential updated in place
+- **WHEN** the credentials file already contains a key and the user enters a new value
 - **THEN** the existing line is updated rather than duplicated
 
-#### Scenario: Declining Discogs writes no token
-- **WHEN** the user declines to enable Discogs
-- **THEN** no `.env` write for `DISCOGS_TOKEN` occurs
+#### Scenario: Declining a secret writes nothing for it
+- **WHEN** the user declines to enable Discogs (or declines Spotify credentials)
+- **THEN** no credentials-file write occurs for the declined secret(s)
 
 ### Requirement: Existing config is not overwritten without confirmation
 
