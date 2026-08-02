@@ -128,6 +128,45 @@ themselves is out of scope here — tracked separately.)
 Note the deliberate asymmetry: layer 2's absence is silent (`is_file()` guard), while
 layers 3–4 raise when named-but-missing.
 
+## Configure command (config-setup)
+
+A new `configure` subcommand in `cli.py`, backed by `configure.py`.
+
+**Prompts (each with a flag + default from the bundled config):**
+
+| Setting | Prompt / flag | Written to |
+|---------|---------------|------------|
+| playlist prefix | `--prefix` | `options.playlist_prefix` |
+| public playlists | `--public/--private` | `options.public_playlists` |
+| genre providers | `--providers a,b,c` | `genre_providers` |
+| earliest decade | `--decade-floor` | `decades.floor` |
+| Discogs token | `--discogs-token` | `.env` (`DISCOGS_TOKEN`), **not** the YAML |
+
+**Minimal output.** The wizard compares each answer to the default drawn from the bundled
+config; only *changed* values are emitted. So accepting every default writes an
+(essentially empty) config — and, more importantly, a config that keeps tracking the
+bundled defaults for anything the user didn't deliberately set. YAML is emitted with the
+same nesting the loader expects (`options:`, `decades:`, top-level `genre_providers:`).
+
+**Prompting is injectable.** `configure.py` takes `prompt`/`secret_prompt`/`out`
+callables (defaulting to `input`, `getpass.getpass`, `print`). `--non-interactive` swaps
+in a no-prompt collector that reads only flags + defaults. Tests pass fakes — no real
+stdin, no real `getpass`, and the target paths (`config.yaml`, `.env`) are redirected into
+`tmp_path`.
+
+**`.env` write is line-aware.** If `.env` exists and has a `DISCOGS_TOKEN=` line, replace
+it in place; otherwise append. Never rewrite unrelated lines. The config-path and env-path
+are parameters (default: the resolved home config, and `./.env`) so tests and power users
+can redirect them.
+
+**Overwrite guard.** If the resolved config path exists and `--force` is not set, print
+"already exists — pass --force to overwrite" and return a non-zero exit *before* touching
+anything.
+
+**Security note.** The token is masked at entry (`getpass`), never echoed, never logged,
+and never placed in the YAML. `.env` is already gitignored. This preserves the existing
+config-vs-secrets boundary (preferences in YAML, secrets in env/`.env`).
+
 ## Testing strategy
 
 - Replace `test_load_falls_back_to_cwd` and `test_no_config_anywhere_raises` (both

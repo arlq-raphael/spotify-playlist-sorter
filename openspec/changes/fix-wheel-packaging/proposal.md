@@ -34,6 +34,13 @@ Two gaps in how the tool loads configuration:
   4. `--config <path>` explicit flag
 - Keep `--config` working; it becomes the top layer of the chain rather than the only
   user layer.
+- **Add a `configure` command** — an interactive wizard (aws-configure-style) that
+  prompts for the common settings and writes a minimal user config to the home location,
+  so users never hand-write YAML. It writes only the settings the user changed (a partial
+  config that keeps inheriting the rest), refuses to overwrite an existing file without
+  `--force`, and keeps secrets out of the YAML: an optional Discogs token is written to
+  `.env` as `DISCOGS_TOKEN`, never into the config. Every prompt also has a flag, and a
+  `--non-interactive` mode makes it scriptable and testable.
 - **BREAKING** (internal only): remove the `_DEFAULT_CONFIG` path constant and the
   `cwd/config/genres.yaml` fallback. No public CLI behaviour regresses for
   correctly-installed users; the change *fixes* wheel installs and *adds* the user-config
@@ -45,6 +52,8 @@ Two gaps in how the tool loads configuration:
 - `config-loading` — how the tool locates, layers, and loads its default and user
   configuration: the packaged default plus the home-directory / env / flag precedence
   chain, independent of installation method.
+- `config-setup` — the `configure` command that interactively generates a user config
+  at the home location and writes an optional Discogs token to `.env`.
 
 ### Modified Capabilities
 - None. (`dedupe` and `genre-providers` requirements are unchanged; they benefit from
@@ -54,9 +63,13 @@ Two gaps in how the tool loads configuration:
 
 - `src/spotify_sorter/config.py` — resource-based default loading + precedence chain.
 - `config/genres.yaml` → `src/spotify_sorter/data/genres.yaml` (moved).
+- `src/spotify_sorter/configure.py` (new) — the wizard logic (prompt/collect/write),
+  wired into `cli.py` as the `configure` subcommand.
 - `pyproject.toml` — in-package `package-data` entry.
 - `tests/test_config.py` — replace cwd-fallback tests; add packaged-resource, home-config
   discovery, env-var, and precedence/merge-order tests.
-- `README.md` — document the user config location and precedence.
-- No new runtime dependency (`importlib.resources` and XDG-path resolution are stdlib on
-  Python 3.9+).
+- `tests/test_configure.py` (new) — wizard prompt handling, partial-config output,
+  `.env` token write, overwrite guard.
+- `README.md` — document the `configure` command, the user config location, and precedence.
+- No new runtime dependency (`importlib.resources`, XDG-path resolution, and `getpass`
+  for masked token entry are all stdlib on Python 3.9+).
