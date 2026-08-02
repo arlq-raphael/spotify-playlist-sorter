@@ -153,10 +153,10 @@ Recognized keys: `DISCOGS_TOKEN`, `SPOTIPY_CLIENT_ID`, `SPOTIPY_CLIENT_SECRET`,
 `SPOTIPY_REDIRECT_URI`. Because they load into the environment, spotipy (`auth.py`) and the
 Discogs provider pick them up unchanged — no call-site edits beyond the startup load.
 
-**Out of scope (noted follow-up):** spotipy caches its OAuth token in a CWD `.cache`, so a
-globally-installed CLI re-auths per directory. Relocating that cache under
-`~/.config/spotify-sorter/` fits this capability's spirit but is left as a separate task to
-keep this change bounded.
+**Out of scope (noted follow-up — tracked in #7):** spotipy caches its OAuth token in a
+CWD `.cache`, so a globally-installed CLI re-auths per directory. Relocating that cache
+under `~/.config/spotify-sorter/` fits this capability's spirit but is left as a separate
+task to keep this change bounded.
 
 ## Configure command (config-setup)
 
