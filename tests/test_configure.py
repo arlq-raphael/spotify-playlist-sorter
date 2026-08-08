@@ -5,7 +5,16 @@ from types import SimpleNamespace
 import yaml
 
 from spotify_sorter.config import Config
-from spotify_sorter.configure import run_configure
+from spotify_sorter.configure import DEFAULT_REDIRECT_URI, run_configure
+
+
+def test_default_redirect_uri_is_a_loopback_ip_literal():
+    """Spotify permits plain HTTP for redirect URIs only on loopback IP literals, and matches
+    registered URIs by exact string — so "localhost" is not interchangeable with "127.0.0.1".
+    Guard the property rather than the literal, so a future edit can change the port but not
+    quietly reintroduce a hostname."""
+    assert DEFAULT_REDIRECT_URI.startswith("http://127.0.0.1:")
+    assert "localhost" not in DEFAULT_REDIRECT_URI
 
 
 def _args(**kw):
@@ -96,7 +105,9 @@ def test_interactive_full_wizard(tmp_path):
     ctext = creds.read_text()
     assert "SPOTIPY_CLIENT_ID=myid" in ctext
     assert "SPOTIPY_CLIENT_SECRET=ssecret" in ctext
-    assert "SPOTIPY_REDIRECT_URI=http://localhost:8888/callback" in ctext   # default kept
+    # Default kept. Must be the loopback IP literal, not "localhost": Spotify matches
+    # registered redirect URIs by exact string, and this has to agree with the README.
+    assert "SPOTIPY_REDIRECT_URI=http://127.0.0.1:8888/callback" in ctext
     assert "DISCOGS_TOKEN" not in ctext          # declined -> nothing written for it
 
 

@@ -16,6 +16,12 @@ import yaml
 from .config import Config, _user_config_path
 from .credentials import credentials_path, write_credential
 
+# Spotify compares registered redirect URIs by exact string, and permits plain HTTP only for
+# loopback IP literals — "localhost" is not equivalent to "127.0.0.1" here. Keep this in step
+# with the README and .env.example; a mismatch surfaces as a redirect-URI error at authorization
+# time, which points at nothing obvious.
+DEFAULT_REDIRECT_URI = "http://127.0.0.1:8888/callback"
+
 
 def _ask(prompt, question: str, default: str) -> str:
     shown = f"{question} [{default}]: " if default != "" else f"{question} []: "
@@ -134,9 +140,11 @@ def _configure_secrets(args, prompt, secret_prompt, out, creds_path, interactive
     ):
         spotify["SPOTIPY_CLIENT_ID"] = prompt("  Spotify client id: ").strip() or None
         spotify["SPOTIPY_CLIENT_SECRET"] = secret_prompt("  Spotify client secret: ").strip() or None
+        # Loopback IP literal, not "localhost" — this must match the README and .env.example
+        # exactly, since Spotify compares registered redirect URIs by exact string.
         spotify["SPOTIPY_REDIRECT_URI"] = (
-            prompt("  Redirect URI [http://localhost:8888/callback]: ").strip()
-            or "http://localhost:8888/callback"
+            prompt(f"  Redirect URI [{DEFAULT_REDIRECT_URI}]: ").strip()
+            or DEFAULT_REDIRECT_URI
         )
     for key, val in spotify.items():
         if val:
