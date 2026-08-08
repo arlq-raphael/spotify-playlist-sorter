@@ -1,19 +1,33 @@
 """Load and represent the genre/decade configuration.
 
-The bundled ``config/genres.yaml`` is the single source of default values. A user
-config passed with ``--config`` is deep-merged *over* those defaults, so a partial
-config only overrides the keys it sets and inherits the rest from the bundled file.
+The bundled default ships inside the package at ``spotify_sorter/data/genres.yaml``
+and holds every default value. Configuration is then assembled by deep-merging up to
+four layers (lowest to highest precedence): the bundled default, a per-user config at
+``~/.config/spotify-sorter/config.yaml`` (honoring ``$XDG_CONFIG_HOME``), a file named
+by ``$SPOTIFY_SORTER_CONFIG``, and a file passed with ``--config``. Each layer may be
+partial and overrides only the keys it sets, inheriting the rest.
 """
 from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
+from importlib.resources import files
 from pathlib import Path
 
 import yaml
 
-# Default config ships in the repo's top-level config/ dir; it holds every default value.
-_DEFAULT_CONFIG = Path(__file__).resolve().parent.parent.parent / "config" / "genres.yaml"
+# The bundled default ships as a package resource, so it is available for every install
+# method (wheel, pipx, editable, clone) without depending on the working directory.
+_DEFAULT_RESOURCE = files("spotify_sorter") / "data" / "genres.yaml"
+
+# Environment variable naming an extra config file (layered above the home config).
+_ENV_CONFIG_VAR = "SPOTIFY_SORTER_CONFIG"
+
+
+def _user_config_path() -> Path:
+    """The per-user config location: ``$XDG_CONFIG_HOME``/``~/.config`` + spotify-sorter/."""
+    base = os.environ.get("XDG_CONFIG_HOME") or (Path.home() / ".config")
+    return Path(base) / "spotify-sorter" / "config.yaml"
 
 
 def _deep_merge(base: dict, override: dict) -> dict:
@@ -50,28 +64,34 @@ class Config:
     raw: dict = field(default_factory=dict)
 
     @classmethod
-    def _bundled_default_path(cls) -> Path:
-        # The packaged config, or ./config/genres.yaml when run from a clone.
-        return _DEFAULT_CONFIG if _DEFAULT_CONFIG.exists() else Path.cwd() / "config" / "genres.yaml"
+    def defaults(cls) -> Config:
+        """Config built from only the bundled default (no user layers) — the canonical
+        defaults, used e.g. by the ``configure`` wizard to show/compare defaults."""
+        return cls._from_dict(yaml.safe_load(_DEFAULT_RESOURCE.read_text(encoding="utf-8")) or {})
 
     @classmethod
     def load(cls, path: str | os.PathLike | None = None) -> Config:
-        default_path = cls._bundled_default_path()
-        base = yaml.safe_load(default_path.read_text(encoding="utf-8")) or {} if default_path.exists() else {}
+        # Layer 1: the packaged default is always present and is the merge base.
+        data = yaml.safe_load(_DEFAULT_RESOURCE.read_text(encoding="utf-8")) or {}
 
-        if path is not None:
-            p = Path(path)
+        # Layer 2: the per-user config is auto-discovered; its absence is not an error.
+        home = _user_config_path()
+        if home.is_file():
+            data = _deep_merge(data, yaml.safe_load(home.read_text(encoding="utf-8")) or {})
+
+        # Layers 3-4: explicitly named files (env var, then --config). Named-but-missing
+        # is a user error and raises — you asked for that file and it is not there.
+        for named in (os.environ.get(_ENV_CONFIG_VAR), path):
+            if named is None:
+                continue
+            p = Path(named)
             if not p.exists():
                 raise FileNotFoundError(
-                    f"Config file not found: {p}. Pass one with --config, or copy config/genres.yaml."
+                    f"Config file not found: {p}. Pass an existing path with --config, "
+                    f"or unset {_ENV_CONFIG_VAR}."
                 )
-            data = _deep_merge(base, yaml.safe_load(p.read_text(encoding="utf-8")) or {})
-        elif base:
-            data = base
-        else:
-            raise FileNotFoundError(
-                "Default config not found. Pass one with --config, or copy config/genres.yaml."
-            )
+            data = _deep_merge(data, yaml.safe_load(p.read_text(encoding="utf-8")) or {})
+
         return cls._from_dict(data)
 
     @classmethod
