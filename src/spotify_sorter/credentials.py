@@ -14,13 +14,6 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-CREDENTIAL_KEYS = (
-    "DISCOGS_TOKEN",
-    "SPOTIPY_CLIENT_ID",
-    "SPOTIPY_CLIENT_SECRET",
-    "SPOTIPY_REDIRECT_URI",
-)
-
 
 def credentials_path() -> Path:
     """The per-user credentials location, next to the config file."""

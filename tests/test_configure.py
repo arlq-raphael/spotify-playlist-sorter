@@ -61,7 +61,9 @@ def test_interactive_discogs_token_via_getpass(tmp_path):
     run_configure(_args(), prompt=lambda *_: next(answers),
                   secret_prompt=lambda *_: "secrettok",
                   config_path=cfg, creds_path=creds)
-    assert "DISCOGS_TOKEN=secrettok" in creds.read_text()
+    ctext = creds.read_text()
+    assert "DISCOGS_TOKEN=secrettok" in ctext
+    assert "SPOTIPY_CLIENT_ID" not in ctext      # declined -> nothing written for it
 
 
 def test_non_interactive_all_flags(tmp_path):
@@ -95,6 +97,7 @@ def test_interactive_full_wizard(tmp_path):
     assert "SPOTIPY_CLIENT_ID=myid" in ctext
     assert "SPOTIPY_CLIENT_SECRET=ssecret" in ctext
     assert "SPOTIPY_REDIRECT_URI=http://localhost:8888/callback" in ctext   # default kept
+    assert "DISCOGS_TOKEN" not in ctext          # declined -> nothing written for it
 
 
 def test_interactive_floor_none(tmp_path):

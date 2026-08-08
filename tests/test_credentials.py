@@ -1,6 +1,7 @@
 import os
 import stat
 
+from spotify_sorter.cli import main
 from spotify_sorter.credentials import credentials_path, load_into_env, write_credential
 
 
@@ -42,6 +43,19 @@ def test_load_into_env_does_not_override(monkeypatch):
     monkeypatch.setenv("DISCOGS_TOKEN", "fromenv")
     load_into_env()
     assert os.environ["DISCOGS_TOKEN"] == "fromenv"    # env wins over the file
+
+
+def test_dotenv_overrides_credentials_file_in_main(tmp_path, monkeypatch):
+    """Full precedence: env > ./.env > credentials file.
+
+    Exercised through main() so the *ordering* of the two loaders is what's under test —
+    swapping those calls must fail here.
+    """
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".env").write_text("DISCOGS_TOKEN=fromdotenv\n")
+    write_credential("DISCOGS_TOKEN", "fromcreds")
+    assert main([]) == 1                                  # no command: loads both, prints help
+    assert os.environ["DISCOGS_TOKEN"] == "fromdotenv"    # .env wins over credentials
 
 
 def test_load_into_env_missing_file_is_noop(tmp_path):
