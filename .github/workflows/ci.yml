@@ -56,3 +56,71 @@ jobs:
           name: coverage-xml
           path: coverage.xml
           if-no-files-found: warn
+
+  install-smoke:
+    # The test job installs editable (`-e`), which resolves the bundled config from the
+    # source tree — so it cannot catch a config that fails to ship in the wheel. This job
+    # installs the built wheel and runs the CLI from OUTSIDE the checkout, where neither
+    # the source tree nor a ./config directory can mask a packaging regression.
+    name: install smoke (wheel)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Build wheel
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build --wheel --outdir dist
+
+      - name: Wheel contains the bundled config
+        run: |
+          python - <<'PY'
+          import glob, zipfile, sys
+          whl = glob.glob("dist/*.whl")[0]
+          names = zipfile.ZipFile(whl).namelist()
+          target = "spotify_sorter/data/genres.yaml"
+          print(whl, "->", target, "present:", target in names)
+          sys.exit(0 if target in names else 1)
+          PY
+
+      - name: Install the wheel (non-editable) and run from outside the checkout
+        run: |
+          python -m venv /tmp/venv
+          /tmp/venv/bin/pip install --quiet dist/*.whl
+          mkdir -p /tmp/neutral && cd /tmp/neutral   # no repo, no ./config here
+          export XDG_CONFIG_HOME=/tmp/neutral/xdg
+
+          # 1. the packaged default loads with no user config anywhere
+          /tmp/venv/bin/python -c "
+          from spotify_sorter.config import Config
+          c = Config.load()
+          assert c.genre_buckets, 'no genre buckets loaded from the packaged default'
+          print('default config OK:', len(c.genre_buckets), 'buckets')"
+
+          # 2. `sort` gets past config loading (fails on credentials, not FileNotFoundError)
+          out=$(/tmp/venv/bin/spotify-sorter sort --dry-run 2>&1 || true)
+          echo "$out"
+          case "$out" in
+            *"Missing environment variables"*) echo "sort reached the credentials check OK" ;;
+            *) echo "::error::sort failed before the credentials check"; exit 1 ;;
+          esac
+
+          # 3. `configure` writes a user config + a 0600 credentials file, and it round-trips
+          # NB: a throwaway literal, not a secret. Never put a real token in a CI command
+          # line (or your shell) — it lands in logs, shell history, and `ps` output.
+          /tmp/venv/bin/spotify-sorter configure --non-interactive --prefix "My " --private \
+            --discogs-token not-a-real-token
+          perms=$(stat -c '%a' "$XDG_CONFIG_HOME/spotify-sorter/credentials")
+          [ "$perms" = "600" ] || { echo "::error::credentials perms are $perms, expected 600"; exit 1; }
+          /tmp/venv/bin/python -c "
+          from spotify_sorter.config import Config
+          c = Config.load()
+          assert c.playlist_prefix == 'My ', c.playlist_prefix
+          assert c.public_playlists is False
+          assert c.genre_buckets, 'user config clobbered the inherited defaults'
+          print('configure round-trip OK')"

@@ -3,6 +3,8 @@
 .cache
 .cache-*
 *.token
+# the per-user secrets file, in case XDG_CONFIG_HOME ever points into a checkout
+credentials
 
 # Persistent genre-lookup cache
 .genre-cache.json
