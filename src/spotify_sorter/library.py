@@ -3,8 +3,11 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass, field
+from typing import Callable
 
 import spotipy
+from requests.exceptions import RequestException
+from spotipy.exceptions import SpotifyException
 
 
 @dataclass
@@ -69,16 +72,46 @@ def fetch_liked_tracks(sp: spotipy.Spotify, limit: int | None = None) -> list[Tr
     return tracks
 
 
-def fetch_artist_genres(sp: spotipy.Spotify, artist_ids: Iterable[str]) -> dict[str, list[str]]:
-    """Batch-fetch genres for artists (Spotify allows 50 ids per request)."""
+def fetch_artist_genres(
+    sp: spotipy.Spotify,
+    artist_ids: Iterable[str],
+    cache=None,
+    notify: Callable[[str], None] = print,
+) -> dict[str, list[str]]:
+    """Genres per artist, looked up one at a time.
+
+    Spotify removed the several-artists endpoint in Feb 2026, so batching is no longer
+    available. Each distinct artist is fetched once per run; with a cache supplied, once
+    ever — which matters because this is ~50x the requests batching made.
+
+    A lookup that fails is skipped rather than aborting the run: genre sources are
+    best-effort, a track usually credits more than one artist, and with this many requests
+    an occasional failure is expected. Failures are reported once so a broken source cannot
+    masquerade as one that simply never matches.
+    """
     unique = list({a for a in artist_ids if a})
     genres: dict[str, list[str]] = {}
-    for i in range(0, len(unique), 50):
-        batch = unique[i : i + 50]
-        res = sp.artists(batch)
-        for artist in res.get("artists", []):
-            if artist and artist.get("id"):
-                genres[artist["id"]] = [g.lower() for g in artist.get("genres", [])]
+    failed = 0
+    for aid in unique:
+        key = f"sp:artist:{aid}"
+        cached = cache.get(key) if cache is not None else None
+        if cached is not None:
+            genres[aid] = cached
+            continue
+        try:
+            artist = sp.artist(aid)
+        except (SpotifyException, RequestException):
+            # Only transport and API failures are tolerated. A blind catch would also
+            # swallow our own parsing bugs and report them as "artist had no genres".
+            failed += 1
+            continue
+        found = [g.lower() for g in (artist or {}).get("genres", [])]
+        genres[aid] = found
+        if cache is not None:
+            cache.set(key, found)   # empty results cached too, so misses cost one lookup ever
+    if failed:
+        notify(f"spotify: {failed} of {len(unique)} artist lookups failed — those tracks may "
+               f"resolve with fewer genres.")
     return genres
 
 
