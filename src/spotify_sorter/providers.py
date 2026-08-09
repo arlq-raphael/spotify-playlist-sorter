@@ -37,11 +37,18 @@ def resolve_genres(tracks: list[Track], providers: list[GenreProvider]) -> dict[
 class SpotifyGenreProvider:
     name = "spotify"
 
-    def __init__(self, sp):
+    def __init__(self, sp, cache=None, notify: Callable[[str], None] = print):
         self.sp = sp
+        # Artists are fetched one at a time since the batch endpoint was removed, so the
+        # persistent cache matters here in a way it did not when 50 came per request.
+        self.cache = cache
+        self.notify = notify
 
     def genres_for(self, tracks: list[Track]) -> dict[str, list[str]]:
-        artist_genres = fetch_artist_genres(self.sp, [a for t in tracks for a in t.artist_ids])
+        artist_genres = fetch_artist_genres(
+            self.sp, [a for t in tracks for a in t.artist_ids],
+            cache=self.cache, notify=self.notify,
+        )
         out: dict[str, list[str]] = {}
         for t in tracks:
             genres: list[str] = []
@@ -60,7 +67,7 @@ def build_providers(
     providers: list[GenreProvider] = []
     for name in config.genre_providers:
         if name == "spotify":
-            providers.append(SpotifyGenreProvider(sp))
+            providers.append(SpotifyGenreProvider(sp, cache, notify))
         elif name == "musicbrainz":
             from .musicbrainz import MusicBrainzGenreProvider
 

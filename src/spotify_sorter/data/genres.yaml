@@ -21,7 +21,11 @@ options:
 
 # --- Genre sources (ordered: first provider with a non-empty result wins) ---
 # Available: musicbrainz (exact ISRC lookup), discogs (artist+title -> genre/style),
-# spotify (artist genres, batched, always available).
+# spotify (artist genres, always available — no token needed).
+# Order matters for accuracy, not just speed: the first two identify the RECORDING, so they
+# can tell a jazz track by a rock artist apart. Spotify only knows genres per ARTIST, so every
+# track by an artist gets the same label whatever that track sounds like. It is last for that
+# reason — it is the floor, not the preference.
 genre_providers: [musicbrainz, discogs, spotify]
 
 discogs:

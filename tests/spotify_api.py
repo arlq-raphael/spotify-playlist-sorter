@@ -48,11 +48,15 @@ def _path_parts(request):
 
 
 class MockAPI:
-    def __init__(self, saved=None, artist_genres=None, playlists=None, user_id="me"):
+    def __init__(self, saved=None, artist_genres=None, playlists=None, user_id="me",
+                 artist_errors=None):
         self.user_id = user_id
         self.saved = list(saved or [])
         self.artist_genres = dict(artist_genres or {})
         self.playlists = dict(playlists or {})  # id -> {name, owner_id, tracks:[track_id]}
+        # {artist_id: status} — lets a test make one lookup fail among many, which is the
+        # case that matters now that artists are fetched one at a time (#23).
+        self.artist_errors = dict(artist_errors or {})
         self._n = 0
 
     # --- GET callbacks ---
@@ -68,12 +72,16 @@ class MockAPI:
         return 200, {}, json.dumps({"items": [{"track": t} for t in page], "next": nxt,
                                     "total": len(self.saved)})
 
-    def _artists(self, request):
-        ids = _q(request).get("ids", [""])[0]
-        ids = ids.split(",") if ids else []
-        return 200, {}, json.dumps(
-            {"artists": [{"id": a, "genres": self.artist_genres.get(a, [])} for a in ids]}
-        )
+    def _artists_batch(self, request):
+        # GET /artists?ids=... was removed from the Web API in Feb 2026 and now answers with a
+        # bare 403. Serving it here is what let a dead code path keep looking healthy (#23).
+        return 403, {}, json.dumps({"error": {"status": 403, "message": "Forbidden"}})
+
+    def _artist(self, request):
+        aid = _path_parts(request)[-1]
+        if aid in self.artist_errors:
+            return self.artist_errors[aid], {}, json.dumps({"error": {"status": 500}})
+        return 200, {}, json.dumps({"id": aid, "genres": self.artist_genres.get(aid, [])})
 
     def _playlists(self, request):
         q = _q(request)
@@ -154,7 +162,10 @@ class MockAPI:
         r.add_callback(r.GET, _pat("/me"), callback=self._me)
         r.add_callback(r.GET, _pat("/me/tracks"), callback=self._saved)
         r.add_callback(r.DELETE, _pat("/me/library"), callback=self._saved_delete)
-        r.add_callback(r.GET, _pat("/artists"), callback=self._artists)
+        # Order matters: the batch pattern must be registered before the single-artist one,
+        # so `/artists?ids=...` is answered as removed rather than matching `/artists/{id}`.
+        r.add_callback(r.GET, _pat("/artists"), callback=self._artists_batch)
+        r.add_callback(r.GET, _pat("/artists/[^/]+"), callback=self._artist)
         r.add_callback(r.GET, _pat("/me/playlists"), callback=self._playlists)
         r.add_callback(r.GET, _pat("/playlists/[^/]+/items"), callback=self._playlist_items)
         r.add_callback(r.POST, _pat("/me/playlists"), callback=self._create)
