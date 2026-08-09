@@ -144,18 +144,62 @@ class MockAPI:
 
 
 def mock_musicbrainz(isrc_genres: dict):
-    """Register the MusicBrainz ISRC endpoint. `isrc_genres`: {isrc: [genre,...]}; a
-    missing ISRC returns 404."""
-    def cb(request):
+    """Register the two MusicBrainz endpoints an ISRC genre lookup needs, as the live
+    service actually behaves.
+
+    `isrc_genres` maps an ISRC to the genres of the recording(s) it identifies:
+
+        {"ISRC1": ["techno"]}                 one recording carrying those genres
+        {"ISRC1": [["techno"], ["dub"]]}      several recordings, in order
+
+    A missing ISRC returns 404. Genres live on the RECORDING, never on the ISRC
+    response — asking the ISRC resource for them is rejected here exactly as the live
+    API rejects it, which is the whole point: a fixture that answered that request is
+    why an invalid one shipped (see #17).
+    """
+    def recordings_for(isrc):
+        val = isrc_genres.get(isrc)
+        if val is None:
+            return None
+        groups = val if val and isinstance(val[0], list) else [val]
+        return [(f"mbid-{isrc}-{i}", g) for i, g in enumerate(groups)]
+
+    genres_by_mbid = {
+        mbid: g for isrc in isrc_genres for mbid, g in (recordings_for(isrc) or [])
+    }
+
+    def isrc_cb(request):
+        query = parse_qs(urlparse(request.url).query)
+        inc = query.get("inc", [""])[0]
+        if "genres" in inc:
+            # The live service refuses this outright; so must the double.
+            return 400, {}, json.dumps({
+                "help": "For usage, please see: https://musicbrainz.org/development/mmd",
+                "error": "genres is not a valid inc parameter for the isrc resource.",
+            })
         isrc = urlparse(request.url).path.rstrip("/").split("/")[-1]
-        genres = isrc_genres.get(isrc)
-        if genres is None:
+        found = recordings_for(isrc)
+        if found is None:
             return 404, {}, json.dumps({"error": "Not Found"})
-        recordings = [{"genres": [{"name": g, "count": 1} for g in genres], "tags": []}]
+        # Note the absence of any genre data — matching the real response.
+        recordings = [{"id": mbid, "title": "t", "length": 1000} for mbid, _ in found]
         return 200, {}, json.dumps({"isrc": isrc, "recordings": recordings})
 
+    def recording_cb(request):
+        mbid = urlparse(request.url).path.rstrip("/").split("/")[-1]
+        if mbid not in genres_by_mbid:
+            return 404, {}, json.dumps({"error": "Not Found"})
+        body = {"id": mbid, "title": "t"}
+        if "genres" in parse_qs(urlparse(request.url).query).get("inc", [""])[0]:
+            body["genres"] = [{"name": g, "count": 1} for g in genres_by_mbid[mbid]]
+        return 200, {}, json.dumps(body)
+
     responses.add_callback(
-        responses.GET, re.compile(r"^https://musicbrainz\.org/ws/2/isrc/[^/?]+"), callback=cb
+        responses.GET, re.compile(r"^https://musicbrainz\.org/ws/2/isrc/[^/?]+"), callback=isrc_cb
+    )
+    responses.add_callback(
+        responses.GET, re.compile(r"^https://musicbrainz\.org/ws/2/recording/[^/?]+"),
+        callback=recording_cb,
     )
 
 

@@ -29,29 +29,62 @@ class MusicBrainzClient:
             time.sleep(wait)
         self._last = time.monotonic()
 
-    def _get(self, isrc: str):
-        return self.session.get(
-            f"{_BASE}/isrc/{isrc}",
-            params={"inc": "genres+tags", "fmt": "json"},
-            headers={"User-Agent": self.user_agent},
-            timeout=15,
-        )
+    def _request(self, path: str, **params):
+        """One paced GET, retried once if MusicBrainz reports it is busy.
+
+        The pacing belongs here, per request, not per track: a lookup costs two requests
+        and both count against the 1 req/sec policy.
+        """
+        def go():
+            self._throttle()
+            return self.session.get(
+                f"{_BASE}/{path}",
+                params={**params, "fmt": "json"},
+                headers={"User-Agent": self.user_agent},
+                timeout=15,
+            )
+
+        resp = go()
+        if resp.status_code == 503:  # "busy"/rate-limited -> wait and retry once
+            time.sleep(max(self.min_interval, 1.0))
+            resp = go()
+        return resp
+
+    def _recording_id_for_isrc(self, isrc: str) -> str | None:
+        """The id of the recording an ISRC identifies, or None if there is no usable one.
+
+        An ISRC may identify several recordings; the first is used, so the work per track
+        stays proportional to a single recording however many it resolves to.
+        """
+        resp = self._request(f"isrc/{isrc}")
+        if resp.status_code == 404:
+            return None
+        resp.raise_for_status()
+        for rec in resp.json().get("recordings", []):
+            if rec.get("id"):
+                return rec["id"]
+        return None
 
     def genres_for_isrc(self, isrc: str) -> list[str]:
-        self._throttle()
-        resp = self._get(isrc)
-        if resp.status_code == 503:  # MusicBrainz "busy"/rate-limited -> wait and retry once
-            time.sleep(max(self.min_interval, 1.0))
-            resp = self._get(isrc)
+        """Genres of the recording an ISRC identifies.
+
+        Two lookups, because genres belong to the recording and the ISRC resource does not
+        carry them — asking it for them is rejected outright ("genres is not a valid inc
+        parameter for the isrc resource"). Callers cache the result including an empty one,
+        so the second lookup is paid once per ISRC rather than once per run.
+        """
+        mbid = self._recording_id_for_isrc(isrc)
+        if mbid is None:
+            return []
+        resp = self._request(f"recording/{mbid}", inc="genres")
         if resp.status_code == 404:
             return []
         resp.raise_for_status()
         genres: list[str] = []
-        for rec in resp.json().get("recordings", []):
-            for g in rec.get("genres", []):
-                name = (g.get("name") or "").lower()
-                if name and name not in genres:
-                    genres.append(name)
+        for g in resp.json().get("genres", []):
+            name = (g.get("name") or "").lower()
+            if name and name not in genres:
+                genres.append(name)
         return genres
 
 
