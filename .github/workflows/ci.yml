@@ -57,6 +57,69 @@ jobs:
           path: coverage.xml
           if-no-files-found: warn
 
+  specs:
+    # Guards the spec set itself. `openspec validate` alone is NOT enough: it only checks
+    # the files present in the checkout, so a spec that was never committed simply isn't
+    # there and it passes. That is exactly how openspec/specs/credentials/ went missing —
+    # a bare `credentials` line in .gitignore swallowed it, and it survived three merged
+    # PRs because every dev machine had the file on disk. Hence the two checks after it.
+    name: specs (openspec)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+
+      - name: Install openspec
+        # Pinned to the major so a 2.x release cannot silently change validation rules.
+        run: npm install -g @fission-ai/openspec@1
+
+      - name: Validate specs
+        run: openspec validate --specs --strict
+
+      - name: Every declared capability has a committed spec
+        run: |
+          python3 - <<'PY'
+          import re, subprocess, sys, pathlib
+
+          tracked = set(subprocess.run(
+              ["git", "ls-files"], capture_output=True, text=True, check=True
+          ).stdout.split())
+
+          # Capabilities are declared in each change's proposal as: - `name` — description
+          decl = re.compile(r"^- `([a-z0-9-]+)`")
+          missing = []
+          for proposal in sorted(pathlib.Path("openspec/changes").rglob("proposal.md")):
+              in_section = False
+              for line in proposal.read_text(encoding="utf-8").splitlines():
+                  if line.startswith("###"):
+                      in_section = "Capabilities" in line
+                      continue
+                  if line.startswith("## "):
+                      in_section = False
+                  if not in_section:
+                      continue
+                  m = decl.match(line)
+                  if m and f"openspec/specs/{m.group(1)}/spec.md" not in tracked:
+                      missing.append((m.group(1), str(proposal)))
+
+          for cap, src in sorted(set(missing)):
+              print(f"::error::capability '{cap}' is declared in {src} but "
+                    f"openspec/specs/{cap}/spec.md is not committed")
+          sys.exit(1 if missing else 0)
+          PY
+
+      - name: No spec file is excluded by .gitignore
+        run: |
+          # Catches an ignore rule that starts matching something already committed.
+          if git ls-files -z openspec | git check-ignore --stdin -z --verbose; then
+            echo "::error::the paths above are under openspec/ but excluded by .gitignore"
+            exit 1
+          fi
+          echo "no openspec path is gitignored"
+
   install-smoke:
     # The test job installs editable (`-e`), which resolves the bundled config from the
     # source tree — so it cannot catch a config that fails to ship in the wheel. This job
