@@ -3,8 +3,14 @@
 .cache
 .cache-*
 *.token
-# the per-user secrets file, in case XDG_CONFIG_HOME ever points into a checkout
-credentials
+# The per-user secrets file, in case XDG_CONFIG_HOME ever points into a checkout. It is
+# always <base>/spotify-sorter/credentials (see credentials_path()), so match on the
+# parent dir, plus a root-anchored rule for a stray hand-made file.
+# NOT a bare `credentials`: that matches any path component at any depth, and silently
+# swallowed openspec/specs/credentials/ — a capability spec present on every dev machine
+# but never committed.
+/credentials
+**/spotify-sorter/credentials
 
 # Persistent genre-lookup cache
 .genre-cache.json
