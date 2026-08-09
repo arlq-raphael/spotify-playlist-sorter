@@ -79,12 +79,20 @@ class Sorter:
         ids: set[str] = set()
         offset = 0
         while True:
+            # Project both field names: entries nest under "item" since Feb 2026, "track"
+            # before it. The server ignores the projection that does not apply. Asking only
+            # for the wrong one is silent — entries come back as empty objects rather than
+            # an error, which reads as "playlist is empty" and re-adds everything (#25).
             res = self.sp.playlist_items(
-                playlist_id, fields="items(track(id)),next", limit=100, offset=offset,
+                playlist_id, fields="items(item(id),track(id)),next", limit=100, offset=offset,
                 additional_types=("track",),
             )
             for it in res.get("items", []):
-                tr = it.get("track") or {}
+                # Entries nest under "item"; "track" is the pre-Feb-2026 shape. Accepting
+                # either keeps this working across the transition — and getting it wrong is
+                # silent, not loud: no ids means every track looks absent and gets re-added,
+                # duplicating the playlist on every run rather than raising (#25).
+                tr = it.get("item") or it.get("track") or {}
                 if tr.get("id"):
                     ids.add(tr["id"])
             if not res.get("next"):
@@ -105,8 +113,11 @@ class Sorter:
                 if dry_run:
                     actions.append(f"[dry-run] CREATE playlist '{name}'  (+{len(track_ids)} tracks)")
                     continue
-                pl = self.sp.user_playlist_create(
-                    self.user_id(), name, public=self.config.public_playlists
+                # Creates under the authenticated user. The per-user form was removed from
+                # the Web API in Feb 2026; ownership by that user is what lets a later run
+                # match this playlist instead of creating another one.
+                pl = self.sp.current_user_playlist_create(
+                    name, public=self.config.public_playlists
                 )
                 pid = pl["id"]
                 existing[name] = pid
