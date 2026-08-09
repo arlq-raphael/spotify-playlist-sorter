@@ -92,19 +92,39 @@ class MockAPI:
         offset = int(q.get("offset", ["0"])[0])
         tracks = self.playlists[pid]["tracks"]
         page = tracks[offset : offset + limit]
-        nxt = (f"{BASE}/playlists/{pid}/tracks?offset={offset + limit}"
+        nxt = (f"{BASE}/playlists/{pid}/items?offset={offset + limit}"
                if offset + limit < len(tracks) else None)
-        return 200, {}, json.dumps({"items": [{"track": {"id": t}} for t in page], "next": nxt})
+        # Entries nest under "item", not "track" — renamed alongside the Feb 2026 move from
+        # /playlists/{id}/tracks to /playlists/{id}/items. Returning the old shape here is
+        # what let a silent idempotency break ship (#25).
+        #
+        # `fields` is honored, not ignored: a projection naming a key that does not exist
+        # yields empty entries, exactly as the live API does. Ignoring it would let a wrong
+        # projection pass every test while returning nothing in production — which is how
+        # the same bug survived its own regression test.
+        fields = q.get("fields", [None])[0]
+        entries = [{"item": {"id": t}} for t in page]
+        if fields and "item(" not in fields:
+            entries = [{} for _ in page]
+        return 200, {}, json.dumps({"items": entries, "next": nxt})
 
     # --- write callbacks ---
     def _create(self, request):
-        uid = _path_parts(request)[-2]
+        # POST /me/playlists — the per-user form was removed from the Web API in Feb 2026.
+        # The owner comes from the mock's own user, not the URL: a created playlist belongs
+        # to the authenticated user regardless of the endpoint's shape.
         body = json.loads(request.body or "{}")
         self._n += 1
         pid = f"pl{self._n}"
-        self.playlists[pid] = {"name": body.get("name", ""), "owner_id": uid, "tracks": []}
+        self.playlists[pid] = {
+            "name": body.get("name", ""),
+            "owner_id": self.user_id,
+            "public": body.get("public"),   # recorded so visibility can be asserted
+            "tracks": [],
+        }
         return 201, {}, json.dumps({"id": pid, "name": body.get("name", ""),
-                                    "owner": {"id": uid}})
+                                    "public": body.get("public"),
+                                    "owner": {"id": self.user_id}})
 
     def _add(self, request):
         # spotipy POSTs a bare JSON list of track URIs to /playlists/{id}/items
@@ -137,7 +157,7 @@ class MockAPI:
         r.add_callback(r.GET, _pat("/artists"), callback=self._artists)
         r.add_callback(r.GET, _pat("/me/playlists"), callback=self._playlists)
         r.add_callback(r.GET, _pat("/playlists/[^/]+/items"), callback=self._playlist_items)
-        r.add_callback(r.POST, _pat("/users/[^/]+/playlists"), callback=self._create)
+        r.add_callback(r.POST, _pat("/me/playlists"), callback=self._create)
         r.add_callback(r.POST, _pat("/playlists/[^/]+/items"), callback=self._add)
         r.add_callback(r.DELETE, _pat("/playlists/[^/]+/items"), callback=self._remove)
         return self

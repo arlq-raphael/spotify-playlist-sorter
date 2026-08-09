@@ -61,6 +61,54 @@ def test_apply_creates_then_is_idempotent():
 
 
 @responses.activate
+def test_created_playlist_is_owned_by_the_authenticated_user():
+    """Ownership is what makes idempotency hold: matching is restricted to playlists the
+    user owns, so a playlist created under any other owner would never be matched again."""
+    api = MockAPI(user_id="me").register()
+    plan = Plan()
+    plan.add("Rock", "t1")
+    Sorter(_client(), Config.load()).apply(plan)
+    created = next(p for p in api.playlists.values() if p["name"] == "Rock")
+    assert created["owner_id"] == "me"
+
+
+@responses.activate
+def test_a_playlist_created_by_one_run_is_matched_by_the_next():
+    """The guarantee the ownership clause protects — a second run must not duplicate."""
+    api = MockAPI().register()
+    plan = Plan()
+    plan.add("Rock", "t1")
+    sorter = Sorter(_client(), Config.load())
+
+    sorter.apply(plan)
+    assert [p["name"] for p in api.playlists.values()].count("Rock") == 1
+
+    second = sorter.apply(plan)                      # same plan, fresh run
+    assert [p["name"] for p in api.playlists.values()].count("Rock") == 1
+    assert any("up to date" in a for a in second)     # matched, not recreated
+
+
+@responses.activate
+def test_creation_request_carries_visibility_from_config():
+    """Asserts the flag is SENT, not that it takes effect.
+
+    The double records what the request carried, so this catches us silently dropping the
+    setting — previously impossible, since the double discarded it. It cannot show that a
+    playlist ends up private: the live API ignores `public` on creation and returns a public
+    playlist either way (#26). Naming this after the outcome would put a green test on a
+    guarantee the platform is not honoring.
+    """
+    api = MockAPI().register()
+    cfg = Config.load()
+    cfg.public_playlists = False
+    plan = Plan()
+    plan.add("Private Bucket", "t1")
+    Sorter(_client(), cfg).apply(plan)
+    created = next(p for p in api.playlists.values() if p["name"] == "Private Bucket")
+    assert created["public"] is False
+
+
+@responses.activate
 def test_apply_dry_run_changes_nothing():
     api = MockAPI().register()
     plan = Plan()
